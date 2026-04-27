@@ -1,0 +1,5 @@
+import { StaffDashboard } from "@/components/StaffDashboard";
+
+export default function Page() {
+  return <StaffDashboard />;
+}
