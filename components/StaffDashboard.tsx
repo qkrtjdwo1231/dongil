@@ -1,29 +1,123 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BasicOrderForm } from "@/components/BasicOrderForm";
+import { ExistingDataUploadPanel } from "@/components/ExistingDataUploadPanel";
 import { FavoritesPanel } from "@/components/FavoritesPanel";
 import { Header } from "@/components/Header";
 import { NeedsCheckList } from "@/components/NeedsCheckList";
 import { OrderList } from "@/components/OrderList";
 import { PlaceholderPanel } from "@/components/PlaceholderPanel";
 import { QuickRegister } from "@/components/QuickRegister";
+import { loadDashboardData, updateOrderStatus } from "@/lib/data-access";
+import { favoriteToDraft } from "@/lib/order-helpers";
 import { supabaseConfig } from "@/lib/supabaseClient";
-import type { Role, StaffMenu } from "@/lib/types";
+import type {
+  BasicOrderDraft,
+  CustomerRecord,
+  FavoriteRecord,
+  ItemRecord,
+  OrderRecord,
+  OrderStatus,
+  Role,
+  StaffMenu
+} from "@/lib/types";
 
-const staffMenus: Array<{ id: StaffMenu; label: string; summary: string }> = [
-  { id: "basic", label: "기본 등록", summary: "빠른 문장 입력과 3단계 폼으로 새 주문 등록" },
-  { id: "quick", label: "빠른 등록", summary: "기존 거래처와 품목 조합을 불러와 수량만 조정" },
-  { id: "orders", label: "주문 목록", summary: "전체 주문 검색, 상태 확인, 수정" },
-  { id: "favorites", label: "즐겨찾기", summary: "자주 쓰는 등록 조합 저장 및 재사용" },
-  { id: "needs-check", label: "확인필요", summary: "규격 누락 또는 확인 상태 주문 확인" }
+const staffMenus: Array<{ id: StaffMenu; label: string }> = [
+  { id: "basic", label: "기본 등록" },
+  { id: "quick", label: "빠른 등록" },
+  { id: "orders", label: "주문 목록" },
+  { id: "needs-check", label: "체크리스트" },
+  { id: "favorites", label: "즐겨찾기" },
+  { id: "import", label: "파일 업로드" }
 ];
+
+function synthesizeCustomers(existing: CustomerRecord[], orders: OrderRecord[]) {
+  const known = new Map(existing.map((customer) => [customer.name, customer]));
+  const created: CustomerRecord[] = [...existing];
+
+  orders.forEach((order) => {
+    if (!known.has(order.customer)) {
+      const customer: CustomerRecord = {
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        name: order.customer,
+        default_site: order.site,
+        default_line: order.line,
+        memo: "주문 데이터에서 자동 생성"
+      };
+      known.set(customer.name, customer);
+      created.push(customer);
+    }
+  });
+
+  return created.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
 
 export function StaffDashboard() {
   const [role, setRole] = useState<Role>("직원");
   const [menu, setMenu] = useState<StaffMenu>("basic");
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [items, setItems] = useState<ItemRecord[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteRecord[]>([]);
+  const [presetDraft, setPresetDraft] = useState<BasicOrderDraft | null>(null);
+  const [presetVersion, setPresetVersion] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const data = await loadDashboardData();
+        setOrders(data.orders);
+        setItems(data.items);
+        setFavorites(data.favorites);
+        setCustomers(synthesizeCustomers(data.customers, data.orders));
+      } catch {
+        setNotice("초기 데이터를 불러오는 중 문제가 발생해 일부 화면은 샘플 데이터로 보일 수 있습니다.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadData();
+  }, []);
+
+  const handleOrderCreated = (order: OrderRecord) => {
+    setOrders((current) => [order, ...current]);
+    setCustomers((current) => synthesizeCustomers(current, [order]));
+  };
+
+  const handleOrdersImported = (importedOrders: OrderRecord[]) => {
+    setOrders((current) => [...importedOrders, ...current]);
+    setCustomers((current) => synthesizeCustomers(current, importedOrders));
+  };
+
+  const handleFavoriteCreated = (favorite: FavoriteRecord) => {
+    setFavorites((current) => [favorite, ...current]);
+  };
+
+  const handleFavoriteLoad = (favorite: FavoriteRecord) => {
+    setPresetDraft(favoriteToDraft(favorite));
+    setPresetVersion((current) => current + 1);
+    setMenu("basic");
+  };
+
+  const handleOrderStatusChange = async (id: string, status: OrderStatus) => {
+    try {
+      const updated = await updateOrderStatus(id, status);
+      setOrders((current) =>
+        current.map((order) => (order.id === id ? { ...order, ...(updated ?? { status }) } : order))
+      );
+    } catch {
+      setNotice("주문 상태 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  };
 
   const renderContent = () => {
+    // TODO: 추후 팀장/대표 대시보드 구현
     if (role === "팀장") {
       return (
         <PlaceholderPanel
@@ -43,58 +137,101 @@ export function StaffDashboard() {
     }
 
     switch (menu) {
+      case "import":
+        return <ExistingDataUploadPanel onOrdersImported={handleOrdersImported} />;
       case "basic":
-        return <BasicOrderForm />;
+        return (
+          <BasicOrderForm
+            customers={customers}
+            orders={orders}
+            presetDraft={presetDraft}
+            presetVersion={presetVersion}
+            onOrderCreated={handleOrderCreated}
+            onFavoriteCreated={handleFavoriteCreated}
+          />
+        );
       case "quick":
-        return <QuickRegister />;
+        return (
+          <QuickRegister
+            customers={customers}
+            items={items}
+            orders={orders}
+            onOrderCreated={handleOrderCreated}
+          />
+        );
       case "orders":
-        return <OrderList />;
+        return <OrderList orders={orders} onStatusChange={handleOrderStatusChange} />;
       case "favorites":
-        return <FavoritesPanel />;
+        return (
+          <FavoritesPanel
+            favorites={favorites}
+            onLoadFavorite={handleFavoriteLoad}
+            onOrderCreated={handleOrderCreated}
+          />
+        );
       case "needs-check":
-        return <NeedsCheckList />;
+        return <NeedsCheckList orders={orders} onStatusChange={handleOrderStatusChange} />;
       default:
-        return <BasicOrderForm />;
+        return null;
     }
   };
 
   return (
     <div className="min-h-screen">
-      <Header role={role} onRoleChange={setRole} />
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <Header
+        role={role}
+        onRoleChange={setRole}
+        navigation={
+          role === "직원" ? (
+            <nav className="overflow-x-auto">
+              <div className="flex min-w-max items-center gap-1 pl-6">
+                {staffMenus.map((item) => {
+                  const active = item.id === menu;
+                  const isUpload = item.id === "import";
+
+                  return (
+                    <div key={item.id} className={`flex items-center ${isUpload ? "ml-auto pl-6" : ""}`}>
+                      <button
+                        type="button"
+                        onClick={() => setMenu(item.id)}
+                        className={[
+                          "rounded-full px-4 py-2 text-sm font-medium tracking-[-0.01em] transition-all",
+                          active
+                            ? "bg-[var(--secondary)] text-[var(--primary)] shadow-sm"
+                            : "text-[#51606f] hover:bg-black/5 hover:text-[var(--foreground)]"
+                        ].join(" ")}
+                      >
+                        {item.label}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </nav>
+          ) : undefined
+        }
+      />
+
+      <main className="mx-auto max-w-7xl px-6 py-6">
         {!supabaseConfig.isConfigured ? (
           <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
             Supabase 환경변수가 설정되지 않았습니다. .env.local을 확인하세요.
           </div>
         ) : null}
 
-        {role === "직원" ? (
-          <nav className="mb-6 overflow-x-auto rounded-[1.75rem] border border-black/5 bg-white/85 p-2 shadow-[0_12px_30px_rgba(24,39,56,0.06)]">
-            <div className="flex min-w-max gap-2">
-            {staffMenus.map((item) => {
-              const active = item.id === menu;
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setMenu(item.id)}
-                  className={[
-                    "rounded-2xl px-5 py-3 text-left transition",
-                    active
-                      ? "bg-[var(--primary)] text-white shadow-[0_10px_24px_rgba(15,107,97,0.18)]"
-                      : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
-                  ].join(" ")}
-                >
-                  <p className="text-sm font-semibold">{item.label}</p>
-                </button>
-              );
-            })}
-            </div>
-          </nav>
+        {notice ? (
+          <div className="mb-6 rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
+            {notice}
+          </div>
         ) : null}
 
-        {renderContent()}
+        {loading ? (
+          <div className="rounded-3xl border border-black/5 bg-white px-5 py-10 text-center text-sm text-[var(--muted)]">
+            주문 데이터와 거래처 정보를 불러오는 중입니다.
+          </div>
+        ) : (
+          renderContent()
+        )}
 
         <section className="mt-6">
           <div className="rounded-[2rem] border border-black/5 bg-[var(--card-strong)] p-6 shadow-[0_18px_60px_rgba(24,39,56,0.08)]">

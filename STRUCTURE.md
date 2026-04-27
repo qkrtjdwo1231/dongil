@@ -12,6 +12,7 @@ dongil/
 │  ├─ Header.tsx
 │  ├─ RoleSwitcher.tsx
 │  ├─ StaffDashboard.tsx
+│  ├─ ExistingDataUploadPanel.tsx
 │  ├─ BasicOrderForm.tsx
 │  ├─ QuickRegister.tsx
 │  ├─ OrderList.tsx
@@ -31,8 +32,10 @@ dongil/
 │  ├─ constants.ts
 │  ├─ utils.ts
 │  ├─ mockData.ts
+│  ├─ data-access.ts
 │  ├─ order-helpers.ts
-│  └─ recommendation.ts
+│  ├─ recommendation.ts
+│  └─ upload-parser.ts
 ├─ supabase/
 │  ├─ schema.sql
 │  └─ seed.sql
@@ -75,11 +78,15 @@ dongil/
 
 #### `StaffDashboard.tsx`
 
-- 직원 전용 메인 화면의 탭 또는 메뉴 전환과 전체 상태 관리를 담당한다.
+- 직원 전용 메인 화면의 상단 탭 전환과 전체 상태 관리를 담당한다.
+
+#### `ExistingDataUploadPanel.tsx`
+
+- 파일 업로드 전용 카테고리 화면을 담당한다.
 
 #### `BasicOrderForm.tsx`
 
-- 기존 데이터 업로드 공간, 빠른 문장 입력, 3단계 등록 폼을 포함한 기본 등록 화면을 담당한다.
+- 빠른 문장 입력과 3단계 등록 폼을 포함한 기본 등록 화면을 담당한다.
 
 #### `QuickRegister.tsx`
 
@@ -155,6 +162,10 @@ dongil/
 
 - Supabase 미연결 상황에서도 UI를 확인할 수 있도록 샘플 데이터 또는 fallback 데이터를 관리한다.
 
+#### `data-access.ts`
+
+- 공용 대시보드 데이터 로딩, 주문 저장, 즐겨찾기 저장, 상태 변경, 업로드 일괄 저장을 담당한다.
+
 #### `order-helpers.ts`
 
 - 주문 저장용 페이로드 구성, 최근 주문 복제용 데이터 정리, 기본값 병합 등을 담당한다.
@@ -162,6 +173,10 @@ dongil/
 #### `recommendation.ts`
 
 - 거래처별 최근 현장, 자주 쓰는 품목, 자주 쓰는 라인 추천용 데이터 가공 함수를 담당한다.
+
+#### `upload-parser.ts`
+
+- 엑셀 및 CSV 파일을 읽고 업로드 미리보기 행으로 변환하는 파서를 담당한다.
 
 ### 2.4 `supabase/`
 

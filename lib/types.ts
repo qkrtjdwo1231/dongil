@@ -1,6 +1,7 @@
 export type Role = "직원" | "팀장" | "대표";
 
 export type StaffMenu =
+  | "import"
   | "basic"
   | "quick"
   | "orders"
@@ -104,4 +105,27 @@ export type CustomerRecommendations = {
     width: number | null;
     height: number | null;
   }>;
+};
+
+export type ImportedOrderDraft = {
+  customer: string;
+  site: string;
+  process: ProcessType | "";
+  item_code: string;
+  item_name: string;
+  width: number | null;
+  height: number | null;
+  quantity: number;
+  line: string;
+  request_no: string;
+  registrant: string;
+  memo: string;
+  status: OrderStatus;
+};
+
+export type UploadPreviewRow = {
+  rowIndex: number;
+  draft: ImportedOrderDraft;
+  valid: boolean;
+  reason?: string;
 };
