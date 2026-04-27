@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ROLES } from "@/lib/constants";
 import type { Role } from "@/lib/types";
 
@@ -9,27 +10,46 @@ type RoleSwitcherProps = {
 };
 
 export function RoleSwitcher({ value, onChange }: RoleSwitcherProps) {
-  return (
-    <div className="inline-flex rounded-2xl border border-black/10 bg-white/80 p-1 shadow-sm backdrop-blur">
-      {ROLES.map((role) => {
-        const active = role === value;
+  const [open, setOpen] = useState(false);
 
-        return (
-          <button
-            key={role}
-            type="button"
-            onClick={() => onChange(role)}
-            className={[
-              "rounded-xl px-4 py-2 text-sm font-semibold transition-colors",
-              active
-                ? "bg-[var(--primary)] text-white shadow-sm"
-                : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
-            ].join(" ")}
-          >
-            {role}
-          </button>
-        );
-      })}
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="inline-flex items-center gap-3 rounded-2xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur"
+      >
+        <span>{value}</span>
+        <span className="text-xs text-[var(--muted)]">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-[calc(100%+0.75rem)] min-w-36 rounded-2xl border border-black/10 bg-white/95 p-2 shadow-[0_18px_40px_rgba(24,39,56,0.14)] backdrop-blur">
+          {ROLES.map((role) => {
+            const active = role === value;
+
+            return (
+              <button
+                key={role}
+                type="button"
+                onClick={() => {
+                  onChange(role);
+                  setOpen(false);
+                }}
+                className={[
+                  "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+                  active
+                    ? "bg-[var(--secondary)] font-semibold text-[var(--primary)]"
+                    : "text-[var(--foreground)] hover:bg-black/5"
+                ].join(" ")}
+              >
+                <span>{role}</span>
+                {active ? <span className="text-xs">선택됨</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

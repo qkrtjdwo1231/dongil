@@ -68,30 +68,9 @@ export function StaffDashboard() {
           </div>
         ) : null}
 
-        <section className="mb-6 grid gap-4 xl:grid-cols-[1.25fr_1fr]">
-          <div className="rounded-[2rem] border border-black/5 bg-[var(--card-strong)] p-6 shadow-[0_18px_60px_rgba(24,39,56,0.08)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
-              직원용 업무 대시보드
-            </p>
-            <h2 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
-              엑셀 대신 흐름대로 등록하는 작업관리 화면
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기 기반 재등록이 쉬운 구조로
-              진행합니다.
-            </p>
-          </div>
-          <div className="rounded-[2rem] border border-black/5 bg-[linear-gradient(135deg,#0f6b61,#153a47)] p-6 text-white shadow-[0_18px_60px_rgba(24,39,56,0.14)]">
-            <p className="text-sm font-semibold tracking-[0.08em] text-white/70">현재 역할</p>
-            <p className="mt-2 text-3xl font-bold tracking-[-0.04em]">{role}</p>
-            <p className="mt-3 text-sm leading-7 text-white/80">
-              Auth는 아직 연결하지 않고, 우측 상단 역할 버튼으로 화면 구성을 먼저 검증합니다.
-            </p>
-          </div>
-        </section>
-
         {role === "직원" ? (
-          <nav className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <nav className="mb-6 overflow-x-auto rounded-[1.75rem] border border-black/5 bg-white/85 p-2 shadow-[0_12px_30px_rgba(24,39,56,0.06)]">
+            <div className="flex min-w-max gap-2">
             {staffMenus.map((item) => {
               const active = item.id === menu;
 
@@ -101,21 +80,36 @@ export function StaffDashboard() {
                   type="button"
                   onClick={() => setMenu(item.id)}
                   className={[
-                    "rounded-3xl border p-5 text-left transition",
+                    "rounded-2xl px-5 py-3 text-left transition",
                     active
-                      ? "border-[var(--primary)]/20 bg-[var(--secondary)] shadow-[0_12px_30px_rgba(15,107,97,0.08)]"
-                      : "border-black/5 bg-white/80 hover:bg-white"
+                      ? "bg-[var(--primary)] text-white shadow-[0_10px_24px_rgba(15,107,97,0.18)]"
+                      : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
                   ].join(" ")}
                 >
-                  <p className="text-base font-semibold text-[var(--foreground)]">{item.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.summary}</p>
+                  <p className="text-sm font-semibold">{item.label}</p>
                 </button>
               );
             })}
+            </div>
           </nav>
         ) : null}
 
         {renderContent()}
+
+        <section className="mt-6">
+          <div className="rounded-[2rem] border border-black/5 bg-[var(--card-strong)] p-6 shadow-[0_18px_60px_rgba(24,39,56,0.08)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+              직원용 업무 대시보드
+            </p>
+            <h2 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
+              엑셀 대신 흐름대로 등록하는 작업관리 화면
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기 기반 재등록이 쉬운 구조로
+              진행합니다.
+            </p>
+          </div>
+        </section>
       </main>
     </div>
   );

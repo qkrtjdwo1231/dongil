@@ -8,7 +8,26 @@ export function BasicOrderForm() {
       description="빠른 문장 입력과 3단계 등록 폼을 결합한 직원용 주문 등록 화면입니다."
       action={<RecentOrderButton disabled />}
     >
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_1.2fr]">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-dashed border-[var(--primary)]/20 bg-[var(--secondary)]/70 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">
+                기존 데이터 업로드
+              </h3>
+              <p className="text-sm leading-6 text-[var(--muted)]">
+                기존 엑셀 파일을 이관할 수 있는 공간입니다. 현재는 업로드 자리만 먼저 제공하고,
+                실제 파싱 및 등록 연결은 추후 작업으로 이어집니다.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center rounded-2xl bg-[var(--foreground)] px-4 py-2.5 text-sm font-semibold text-white">
+              파일 선택
+              <input type="file" accept=".xlsx,.xls,.csv" className="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_1.2fr]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-black/5 bg-white p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -77,6 +96,7 @@ export function BasicOrderForm() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </SectionCard>
   );

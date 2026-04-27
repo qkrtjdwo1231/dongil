@@ -14,7 +14,7 @@ export function Header({ role, onRoleChange }: HeaderProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--primary)]">
             Dongil Glass
           </p>
-          <h1 className="text-2xl font-bold tracking-[-0.03em] text-[var(--foreground)]">
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-[var(--foreground)]">
             동일유리 작업관리
           </h1>
         </div>
