@@ -70,6 +70,7 @@ create table if not exists public.uploaded_files (
   parsed_rows integer not null default 0,
   status text not null default 'processing',
   header_snapshot jsonb not null default '[]'::jsonb,
+  analysis_snapshot jsonb not null default '{}'::jsonb,
   summary_text text,
   error_message text
 );
@@ -118,6 +119,9 @@ create table if not exists public.ai_conversations (
   used_file_ids jsonb not null default '[]'::jsonb,
   used_row_ids jsonb not null default '[]'::jsonb
 );
+
+alter table if exists public.uploaded_files
+  add column if not exists analysis_snapshot jsonb not null default '{}'::jsonb;
 
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_customer_idx on public.orders (customer);

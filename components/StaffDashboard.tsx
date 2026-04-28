@@ -33,7 +33,7 @@ export function StaffDashboard() {
 
   const handleImportComplete = async (result: UploadImportResult) => {
     await reloadDashboard(
-      `${result.insertedRows.toLocaleString()}건 업로드를 완료했습니다. 유효 ${result.validRows.toLocaleString()}건, 검토 필요 ${result.invalidRows.toLocaleString()}건입니다.`
+      `${result.insertedUploadRows?.toLocaleString() ?? 0}개 분석 행을 저장했습니다. 주문 테이블 반영 ${result.insertedRows.toLocaleString()}건, 검토 필요 ${result.invalidRows.toLocaleString()}건입니다.`
     );
   };
 

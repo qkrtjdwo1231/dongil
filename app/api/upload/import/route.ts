@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildOrderInsertRows,
@@ -27,10 +27,26 @@ function sanitizeFileName(fileName: string) {
     return fallback;
   }
 
-  return trimmed
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "") || fallback;
+  return (
+    trimmed
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback
+  );
+}
+
+function buildSummaryText(extraction: ReturnType<typeof extractWorkbookData>) {
+  const parts = [
+    `총 ${extraction.totalRows.toLocaleString()}행`,
+    extraction.analysis.periodStart && extraction.analysis.periodEnd
+      ? `${extraction.analysis.periodStart} ~ ${extraction.analysis.periodEnd}`
+      : null,
+    `수량 ${extraction.analysis.totalQuantity.toLocaleString()}`,
+    `평수 ${extraction.analysis.totalArea.toFixed(1)}`,
+    extraction.analysis.highlights[0] ?? null
+  ];
+
+  return parts.filter(Boolean).join(" · ");
 }
 
 async function saveUploadSourceFile(
@@ -81,6 +97,7 @@ export async function POST(request: Request) {
     const buffer = await file.arrayBuffer();
     const storedFile = await saveUploadSourceFile(supabase, file, buffer);
     const extraction = extractWorkbookData(buffer, file.name);
+    const summaryText = buildSummaryText(extraction);
 
     const fileInsert = await supabase
       .from("uploaded_files")
@@ -93,7 +110,8 @@ export async function POST(request: Request) {
         parsed_rows: extraction.parsedRows.length,
         status: "processing",
         header_snapshot: extraction.headers,
-        summary_text: `총 ${extraction.totalRows}행, 유효 ${extraction.validRows}건, 검토 필요 ${extraction.invalidRows}건`
+        summary_text: summaryText,
+        analysis_snapshot: extraction.analysis
       })
       .select("id")
       .single();
@@ -127,7 +145,8 @@ export async function POST(request: Request) {
       .update({
         status: "completed",
         parsed_rows: extraction.parsedRows.length,
-        summary_text: `총 ${extraction.totalRows}행, 유효 ${extraction.validRows}건, 검토 필요 ${extraction.invalidRows}건`
+        summary_text: summaryText,
+        analysis_snapshot: extraction.analysis
       })
       .eq("id", uploadedFileId);
 
@@ -136,6 +155,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
+      fileName: extraction.fileName,
+      sheetName: extraction.sheetName,
       totalRows: extraction.totalRows,
       validRows: extraction.validRows,
       invalidRows: extraction.invalidRows,
@@ -143,7 +164,8 @@ export async function POST(request: Request) {
       insertedUploadRows: uploadedRows.length,
       uploadedFileId,
       storedFileBucket: storedFile.bucket,
-      storedFilePath: storedFile.path
+      storedFilePath: storedFile.path,
+      analysis: extraction.analysis
     });
   } catch (error) {
     return NextResponse.json(

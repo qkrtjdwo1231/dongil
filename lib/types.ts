@@ -119,15 +119,52 @@ export type UploadPreviewRow = {
   reason?: string;
 };
 
+export type UploadAnalysisGroup = {
+  label: string;
+  count: number;
+  quantity: number;
+  area: number;
+};
+
+export type UploadAnalysisSnapshot = {
+  periodStart: string | null;
+  periodEnd: string | null;
+  totalQuantity: number;
+  totalArea: number;
+  uniqueCustomers: number;
+  uniqueSites: number;
+  uniqueItems: number;
+  uniqueLines: number;
+  uniqueRegistrants: number;
+  uniquePids: number;
+  rowsWithPid: number;
+  rowsMissingPid: number;
+  rowsMissingDimensions: number;
+  rowsMissingCustomer: number;
+  rowsMissingItemName: number;
+  rowsMissingQuantity: number;
+  rowsMarkedHold: number;
+  topCustomers: UploadAnalysisGroup[];
+  topItems: UploadAnalysisGroup[];
+  topLines: UploadAnalysisGroup[];
+  topProcesses: UploadAnalysisGroup[];
+  topRegistrants: UploadAnalysisGroup[];
+  highlights: string[];
+};
+
 export type UploadPreviewSummary = {
   fileName: string;
+  sheetName?: string | null;
   totalRows: number;
   validRows: number;
   invalidRows: number;
   previewRows: UploadPreviewRow[];
+  analysis: UploadAnalysisSnapshot;
 };
 
 export type UploadImportResult = {
+  fileName?: string;
+  sheetName?: string | null;
   totalRows: number;
   validRows: number;
   invalidRows: number;
@@ -136,6 +173,7 @@ export type UploadImportResult = {
   insertedUploadRows?: number;
   storedFileBucket?: string;
   storedFilePath?: string;
+  analysis: UploadAnalysisSnapshot;
 };
 
 export type StoredUploadFile = {

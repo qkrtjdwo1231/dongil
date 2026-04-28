@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/SectionCard";
 import { AiMemoryRulesPanel } from "@/components/AiMemoryRulesPanel";
 import { UploadChatPanel } from "@/components/UploadChatPanel";
-import type { StoredUploadFile, UploadImportResult, UploadPreviewSummary } from "@/lib/types";
+import type {
+  StoredUploadFile,
+  UploadAnalysisGroup,
+  UploadImportResult,
+  UploadPreviewSummary
+} from "@/lib/types";
 
 const UPLOAD_HISTORY_STORAGE_KEY = "existing-data-upload-history";
 
@@ -66,6 +71,23 @@ function formatBytes(value: number | null) {
     return `${(value / 1024).toFixed(1)} KB`;
   }
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDateRange(start: string | null | undefined, end: string | null | undefined) {
+  if (!start || !end) {
+    return "기간 정보 없음";
+  }
+
+  return `${start} ~ ${end}`;
+}
+
+function renderTopGroup(groups: UploadAnalysisGroup[]) {
+  if (!groups.length) {
+    return "-";
+  }
+
+  const top = groups[0];
+  return `${top.label} (${top.quantity.toLocaleString()})`;
 }
 
 function buildFileStatus(summary: UploadPreviewSummary | null, loading: boolean, saving: boolean) {
@@ -191,7 +213,10 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
       setSummary(preview);
       setUploadedFileNames((current) => [file.name, ...current.filter((name) => name !== file.name)]);
       setMessage(
-        `파일 분석을 완료했습니다. 총 ${preview.totalRows.toLocaleString()}행 중 유효 ${preview.validRows.toLocaleString()}건을 확인했습니다.`
+        `파일 분석을 완료했습니다. ${formatDateRange(
+          preview.analysis.periodStart,
+          preview.analysis.periodEnd
+        )} 기준 ${preview.totalRows.toLocaleString()}행, 총 수량 ${preview.analysis.totalQuantity.toLocaleString()}, 총 평수 ${preview.analysis.totalArea.toFixed(1)}를 확인했습니다.`
       );
     } catch (uploadError) {
       setSelectedFile(null);
@@ -212,14 +237,14 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
       return;
     }
 
-    if (!summary?.validRows) {
-      setError("가져올 수 있는 유효 데이터가 없습니다.");
+    if (!summary?.totalRows) {
+      setError("먼저 분석할 행 데이터가 있는 파일을 선택해 주세요.");
       return;
     }
 
     setSaving(true);
     setError(null);
-    setMessage("선택한 파일을 주문 데이터로 저장하는 중입니다.");
+    setMessage("선택한 파일을 분석용 데이터와 원본 행 기준으로 저장하는 중입니다.");
 
     try {
       const result = await postUpload<UploadImportResult>("/api/upload/import", selectedFile);
@@ -227,7 +252,9 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
       const storageNote = result.storedFilePath
         ? ` 저장 위치: ${result.storedFileBucket}/${result.storedFilePath}`
         : "";
-      setMessage(`${result.insertedRows.toLocaleString()}건 저장을 완료했습니다.${storageNote}`);
+      setMessage(
+        `분석 행 ${result.insertedUploadRows?.toLocaleString() ?? 0}건 저장을 완료했습니다. 주문 테이블 반영 ${result.insertedRows.toLocaleString()}건.${storageNote}`
+      );
       await loadStoredFiles();
     } catch (uploadError) {
       setError(
@@ -431,15 +458,37 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                 <p className="text-sm font-semibold text-[var(--foreground)]">분석 요약</p>
                 <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
                   <div className="flex items-center justify-between">
+                    <span>분석 기간</span>
+                    <strong className="text-[var(--foreground)]">
+                      {summary
+                        ? formatDateRange(summary.analysis.periodStart, summary.analysis.periodEnd)
+                        : "기간 정보 없음"}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span>총 행</span>
                     <strong className="text-[var(--foreground)]">
                       {summary ? summary.totalRows.toLocaleString() : 0}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>유효 행</span>
+                    <span>총 수량</span>
                     <strong className="text-emerald-700">
-                      {summary ? summary.validRows.toLocaleString() : 0}
+                      {summary ? summary.analysis.totalQuantity.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>총 평수</span>
+                    <strong className="text-[var(--foreground)]">
+                      {summary ? summary.analysis.totalArea.toFixed(1) : "0.0"}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>거래처 / 품명</span>
+                    <strong className="text-[var(--foreground)]">
+                      {summary
+                        ? `${summary.analysis.uniqueCustomers.toLocaleString()} / ${summary.analysis.uniqueItems.toLocaleString()}`
+                        : "0 / 0"}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
@@ -449,9 +498,11 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>PID 포함 미리보기</span>
-                    <strong className={hasPidRows(summary) ? "text-emerald-700" : "text-amber-700"}>
-                      {hasPidRows(summary) ? "예" : "아니오"}
+                    <span>PID 누락 / 규격 누락</span>
+                    <strong className={hasPidRows(summary) ? "text-amber-700" : "text-[var(--foreground)]"}>
+                      {summary
+                        ? `${summary.analysis.rowsMissingPid.toLocaleString()} / ${summary.analysis.rowsMissingDimensions.toLocaleString()}`
+                        : "0 / 0"}
                     </strong>
                   </div>
                 </div>
@@ -459,12 +510,12 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                 <button
                   type="button"
                   onClick={handleImport}
-                  disabled={saving || !summary?.validRows}
+                  disabled={saving || !summary?.totalRows}
                   className="mt-6 w-full rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving
-                    ? "배치 등록 중..."
-                    : `유효 행 ${summary?.validRows.toLocaleString() ?? 0}건 등록`}
+                    ? "분석 데이터 저장 중..."
+                    : `분석 행 ${summary?.totalRows.toLocaleString() ?? 0}건 저장`}
                 </button>
               </div>
 
@@ -504,7 +555,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                             <td className="px-3 py-3">
                               {row.valid ? (
                                 <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                  업로드 가능
+                                  핵심 필드 충족
                                 </span>
                               ) : (
                                 <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -518,6 +569,74 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     </table>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-black/5 bg-white p-5">
+                <p className="text-sm font-semibold text-[var(--foreground)]">상위 분포</p>
+                <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>주요 거래처</span>
+                    <strong className="text-right text-[var(--foreground)]">
+                      {summary ? renderTopGroup(summary.analysis.topCustomers) : "-"}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>주요 품목</span>
+                    <strong className="text-right text-[var(--foreground)]">
+                      {summary ? renderTopGroup(summary.analysis.topItems) : "-"}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>주요 라인</span>
+                    <strong className="text-right text-[var(--foreground)]">
+                      {summary ? renderTopGroup(summary.analysis.topLines) : "-"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 bg-white p-5">
+                <p className="text-sm font-semibold text-[var(--foreground)]">데이터 품질</p>
+                <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>PID 보유 행</span>
+                    <strong className="text-[var(--foreground)]">
+                      {summary ? summary.analysis.rowsWithPid.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>거래처 누락</span>
+                    <strong className="text-amber-700">
+                      {summary ? summary.analysis.rowsMissingCustomer.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>품명 누락</span>
+                    <strong className="text-amber-700">
+                      {summary ? summary.analysis.rowsMissingItemName.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-black/5 bg-white p-5">
+                <p className="text-sm font-semibold text-[var(--foreground)]">대표 체크 포인트</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {summary?.analysis.highlights?.length ? (
+                    summary.analysis.highlights.map((highlight) => (
+                      <span
+                        key={highlight}
+                        className="rounded-full bg-[var(--secondary)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)]"
+                      >
+                        {highlight}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-[var(--muted)]">파일을 선택하면 검토 포인트가 표시됩니다.</span>
+                  )}
+                </div>
               </div>
             </div>
 

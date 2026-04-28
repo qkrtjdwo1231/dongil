@@ -1,9 +1,11 @@
-﻿import * as XLSX from "xlsx";
+import * as XLSX from "xlsx";
 import { calculateAreaPyeong } from "@/lib/calculations";
 import type {
   ImportedOrderDraft,
   OrderStatus,
   ProcessType,
+  UploadAnalysisGroup,
+  UploadAnalysisSnapshot,
   UploadPreviewRow,
   UploadPreviewSummary
 } from "@/lib/types";
@@ -54,6 +56,33 @@ type UploadExtraction = {
   invalidRows: number;
   parsedRows: ParsedUploadRow[];
   previewRows: UploadPreviewRow[];
+  analysis: UploadAnalysisSnapshot;
+};
+
+const EMPTY_ANALYSIS: UploadAnalysisSnapshot = {
+  periodStart: null,
+  periodEnd: null,
+  totalQuantity: 0,
+  totalArea: 0,
+  uniqueCustomers: 0,
+  uniqueSites: 0,
+  uniqueItems: 0,
+  uniqueLines: 0,
+  uniqueRegistrants: 0,
+  uniquePids: 0,
+  rowsWithPid: 0,
+  rowsMissingPid: 0,
+  rowsMissingDimensions: 0,
+  rowsMissingCustomer: 0,
+  rowsMissingItemName: 0,
+  rowsMissingQuantity: 0,
+  rowsMarkedHold: 0,
+  topCustomers: [],
+  topItems: [],
+  topLines: [],
+  topProcesses: [],
+  topRegistrants: [],
+  highlights: []
 };
 
 function normalizeHeader(value: unknown) {
@@ -219,6 +248,208 @@ function buildNormalizedText(parsed: {
   return parts.filter((value): value is string => Boolean(value && value.trim())).join(" ");
 }
 
+function countUnique(values: Array<string | null | undefined>) {
+  return new Set(values.filter((value): value is string => Boolean(value && value.trim()))).size;
+}
+
+function formatDateLabel(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function buildTopGroups(
+  map: Map<string, { count: number; quantity: number; area: number }>,
+  limit = 5
+): UploadAnalysisGroup[] {
+  return [...map.entries()]
+    .map(([label, value]) => ({
+      label,
+      count: value.count,
+      quantity: value.quantity,
+      area: value.area
+    }))
+    .sort((left, right) => {
+      if (right.quantity !== left.quantity) {
+        return right.quantity - left.quantity;
+      }
+      if (right.area !== left.area) {
+        return right.area - left.area;
+      }
+      return right.count - left.count;
+    })
+    .slice(0, limit);
+}
+
+function upsertMetric(
+  map: Map<string, { count: number; quantity: number; area: number }>,
+  key: string | null | undefined,
+  quantity: number,
+  area: number
+) {
+  const label = key?.trim();
+  if (!label) {
+    return;
+  }
+
+  const current = map.get(label) ?? { count: 0, quantity: 0, area: 0 };
+  current.count += 1;
+  current.quantity += quantity;
+  current.area += area;
+  map.set(label, current);
+}
+
+function buildHighlights(summary: Omit<UploadAnalysisSnapshot, "highlights">) {
+  const highlights: string[] = [];
+
+  if (summary.rowsMissingPid > 0) {
+    highlights.push(`PID 누락 ${summary.rowsMissingPid.toLocaleString()}건`);
+  }
+
+  if (summary.rowsMissingDimensions > 0) {
+    highlights.push(`규격 누락 ${summary.rowsMissingDimensions.toLocaleString()}건`);
+  }
+
+  if (summary.rowsMissingQuantity > 0) {
+    highlights.push(`수량 누락 ${summary.rowsMissingQuantity.toLocaleString()}건`);
+  }
+
+  if (summary.rowsMarkedHold > 0) {
+    highlights.push(`보류/확인필요 상태 ${summary.rowsMarkedHold.toLocaleString()}건`);
+  }
+
+  if (summary.topCustomers.length && summary.totalQuantity > 0) {
+    const topCustomer = summary.topCustomers[0];
+    const concentration = (topCustomer.quantity / summary.totalQuantity) * 100;
+    if (concentration >= 35) {
+      highlights.push(`${topCustomer.label} 비중 ${concentration.toFixed(1)}%`);
+    }
+  }
+
+  if (summary.topLines.length && summary.totalQuantity > 0) {
+    const topLine = summary.topLines[0];
+    const lineShare = (topLine.quantity / summary.totalQuantity) * 100;
+    if (lineShare >= 55) {
+      highlights.push(`${topLine.label} 라인 집중 ${lineShare.toFixed(1)}%`);
+    }
+  }
+
+  if (!highlights.length) {
+    highlights.push("업로드 직후 바로 분석 가능한 기본 구조를 확인했습니다.");
+  }
+
+  return highlights.slice(0, 6);
+}
+
+function buildAnalysisSnapshot(parsedRows: ParsedUploadRow[]): UploadAnalysisSnapshot {
+  if (!parsedRows.length) {
+    return EMPTY_ANALYSIS;
+  }
+
+  const customerMap = new Map<string, { count: number; quantity: number; area: number }>();
+  const itemMap = new Map<string, { count: number; quantity: number; area: number }>();
+  const lineMap = new Map<string, { count: number; quantity: number; area: number }>();
+  const processMap = new Map<string, { count: number; quantity: number; area: number }>();
+  const registrantMap = new Map<string, { count: number; quantity: number; area: number }>();
+
+  const createdAtList = parsedRows
+    .map((row) => row.createdAt)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
+
+  let totalQuantity = 0;
+  let totalArea = 0;
+  let rowsWithPid = 0;
+  let rowsMissingPid = 0;
+  let rowsMissingDimensions = 0;
+  let rowsMissingCustomer = 0;
+  let rowsMissingItemName = 0;
+  let rowsMissingQuantity = 0;
+  let rowsMarkedHold = 0;
+
+  parsedRows.forEach((row) => {
+    const quantity = row.draft.quantity || 0;
+    const area =
+      row.draft.width && row.draft.height && row.draft.quantity
+        ? (calculateAreaPyeong(row.draft.width, row.draft.height, row.draft.quantity) ?? 0)
+        : 0;
+
+    totalQuantity += quantity;
+    totalArea += area;
+
+    if (row.pid) {
+      rowsWithPid += 1;
+    } else {
+      rowsMissingPid += 1;
+    }
+
+    if (!row.draft.width || !row.draft.height) {
+      rowsMissingDimensions += 1;
+    }
+
+    if (!row.draft.customer.trim()) {
+      rowsMissingCustomer += 1;
+    }
+
+    if (!row.draft.item_name.trim()) {
+      rowsMissingItemName += 1;
+    }
+
+    if (!row.draft.quantity) {
+      rowsMissingQuantity += 1;
+    }
+
+    if (row.draft.status === "확인필요" || row.draft.status === "보류") {
+      rowsMarkedHold += 1;
+    }
+
+    upsertMetric(customerMap, row.draft.customer, quantity, area);
+    upsertMetric(itemMap, row.draft.item_name, quantity, area);
+    upsertMetric(lineMap, row.draft.line, quantity, area);
+    upsertMetric(processMap, row.draft.process, quantity, area);
+    upsertMetric(registrantMap, row.draft.registrant, quantity, area);
+  });
+
+  const baseSummary = {
+    periodStart: formatDateLabel(createdAtList[0] ?? null),
+    periodEnd: formatDateLabel(createdAtList.at(-1) ?? null),
+    totalQuantity,
+    totalArea,
+    uniqueCustomers: countUnique(parsedRows.map((row) => row.draft.customer)),
+    uniqueSites: countUnique(parsedRows.map((row) => row.draft.site)),
+    uniqueItems: countUnique(parsedRows.map((row) => row.draft.item_name)),
+    uniqueLines: countUnique(parsedRows.map((row) => row.draft.line)),
+    uniqueRegistrants: countUnique(parsedRows.map((row) => row.draft.registrant)),
+    uniquePids: countUnique(parsedRows.map((row) => row.pid)),
+    rowsWithPid,
+    rowsMissingPid,
+    rowsMissingDimensions,
+    rowsMissingCustomer,
+    rowsMissingItemName,
+    rowsMissingQuantity,
+    rowsMarkedHold,
+    topCustomers: buildTopGroups(customerMap),
+    topItems: buildTopGroups(itemMap),
+    topLines: buildTopGroups(lineMap),
+    topProcesses: buildTopGroups(processMap),
+    topRegistrants: buildTopGroups(registrantMap)
+  };
+
+  return {
+    ...baseSummary,
+    highlights: buildHighlights(baseSummary)
+  };
+}
+
 function parseWorksheetRow(
   worksheet: XLSX.WorkSheet,
   rowIndex: number,
@@ -287,7 +518,8 @@ export function extractWorkbookData(
       validRows: 0,
       invalidRows: 0,
       parsedRows: [],
-      previewRows: []
+      previewRows: [],
+      analysis: EMPTY_ANALYSIS
     };
   }
 
@@ -340,7 +572,8 @@ export function extractWorkbookData(
     validRows,
     invalidRows,
     parsedRows,
-    previewRows
+    previewRows,
+    analysis: buildAnalysisSnapshot(parsedRows)
   };
 }
 
@@ -353,10 +586,12 @@ export function analyzeWorkbook(
 
   return {
     fileName: extraction.fileName,
+    sheetName: extraction.sheetName,
     totalRows: extraction.totalRows,
     validRows: extraction.validRows,
     invalidRows: extraction.invalidRows,
-    previewRows: extraction.previewRows
+    previewRows: extraction.previewRows,
+    analysis: extraction.analysis
   };
 }
 
