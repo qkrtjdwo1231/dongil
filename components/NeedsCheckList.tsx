@@ -32,7 +32,7 @@ export function NeedsCheckList({ orders, onStatusChange }: NeedsCheckListProps) 
   return (
     <SectionCard
       title="체크리스트"
-      description="누락 규격이나 확인필요 상태가 있는 주문을 별도로 점검하는 화면입니다."
+      description="누락 규격이나 확인필요 상태가 있는 주문을 따로 모아 보는 화면입니다."
     >
       <div className="space-y-4">
         {!checklistOrders.length ? (
@@ -45,13 +45,15 @@ export function NeedsCheckList({ orders, onStatusChange }: NeedsCheckListProps) 
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-[var(--primary)]">{order.customer}</p>
-                  <h3 className="mt-1 text-lg font-bold text-[var(--foreground)]">{order.item_name || "품명 없음"}</h3>
+                  <h3 className="mt-1 text-lg font-bold text-[var(--foreground)]">
+                    {order.item_name || "품명 없음"}
+                  </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                     {joinText([
                       order.site,
                       order.width && order.height ? `${order.width} x ${order.height}` : null,
                       order.line
-                    ]) || "세부 정보 부족"}
+                    ]) || "기본 정보 부족"}
                   </p>
                 </div>
                 <StatusBadge status={order.status} />

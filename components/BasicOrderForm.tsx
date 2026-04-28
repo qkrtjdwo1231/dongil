@@ -53,7 +53,7 @@ export function BasicOrderForm({
   useEffect(() => {
     if (presetDraft) {
       setDraft(presetDraft);
-      setMessage("다른 화면에서 선택한 데이터를 기본 등록 폼에 불러왔습니다.");
+      setMessage("선택한 즐겨찾기 내용을 기본 등록 폼으로 불러왔습니다.");
       setError(null);
     }
   }, [presetDraft, presetVersion]);
@@ -110,13 +110,13 @@ export function BasicOrderForm({
     }
 
     setDraft(cloneLatestOrderToDraft(latestOrder));
-    setMessage("직전 주문을 불러왔습니다. 필요한 항목만 수정 후 다시 등록할 수 있습니다.");
+    setMessage("직전 주문을 불러왔습니다. 필요한 항목만 수정해서 다시 등록하면 됩니다.");
     setError(null);
   };
 
   const saveFavorite = async () => {
     if (!draft.customer.trim() || !draft.item_name.trim()) {
-      setError("즐겨찾기 저장 전에는 최소 거래처와 품명을 입력해 주세요.");
+      setError("즐겨찾기로 저장하려면 최소한 거래처와 품명은 입력해 주세요.");
       return;
     }
 
@@ -150,7 +150,7 @@ export function BasicOrderForm({
       onOrderCreated(createdOrder);
       setDraft(createEmptyOrderDraft());
       setQuickText("");
-      setMessage("주문이 등록되었습니다.");
+      setMessage("주문을 등록했습니다.");
     } catch {
       setError("주문 저장에 실패했습니다. Supabase 연결 상태를 확인해 주세요.");
     } finally {
@@ -198,7 +198,7 @@ export function BasicOrderForm({
                 className="w-full resize-none rounded-2xl border border-black/10 bg-[#f8fafb] px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
               />
               <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-                추후 AI API 연결을 고려해 로컬 파서 모듈로 분리해 두었습니다.
+                문장에서 규격, 수량, 라인 같은 기본 정보를 추출해 폼에 채워줍니다.
               </p>
             </div>
 
@@ -209,7 +209,7 @@ export function BasicOrderForm({
               </div>
               {!draft.customer.trim() ? (
                 <p className="text-sm leading-6 text-[var(--muted)]">
-                  거래처를 먼저 입력하면 최근 현장, 자주 쓰는 품목, 라인 추천을 보여드립니다.
+                  거래처를 먼저 입력하면 최근 현장, 자주 쓰는 품명, 라인 추천을 보여줍니다.
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -228,12 +228,12 @@ export function BasicOrderForm({
                           </button>
                         ))
                       ) : (
-                        <span className="text-sm text-[var(--muted)]">추천 현장이 아직 없습니다.</span>
+                        <span className="text-sm text-[var(--muted)]">추천할 현장이 아직 없습니다.</span>
                       )}
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-[var(--muted)]">자주 쓰는 품목</p>
+                    <p className="text-xs font-semibold text-[var(--muted)]">자주 쓰는 품명</p>
                     <div className="flex flex-wrap gap-2">
                       {recommendations?.frequentItems.length ? (
                         recommendations.frequentItems.map((item) => (
@@ -252,7 +252,7 @@ export function BasicOrderForm({
                           </button>
                         ))
                       ) : (
-                        <span className="text-sm text-[var(--muted)]">추천 품목이 아직 없습니다.</span>
+                        <span className="text-sm text-[var(--muted)]">추천할 품명이 아직 없습니다.</span>
                       )}
                     </div>
                   </div>
@@ -271,7 +271,7 @@ export function BasicOrderForm({
                           </button>
                         ))
                       ) : (
-                        <span className="text-sm text-[var(--muted)]">추천 라인이 아직 없습니다.</span>
+                        <span className="text-sm text-[var(--muted)]">추천할 라인이 아직 없습니다.</span>
                       )}
                     </div>
                   </div>
@@ -472,7 +472,7 @@ export function BasicOrderForm({
                       {areaPyeong ? `${areaPyeong} 평` : "계산 대기"}
                     </p>
                   </div>
-                  <p className="text-xs leading-5 text-[var(--warning)]">회사 공식 계산식 확인 필요</p>
+                  <p className="text-xs leading-5 text-[var(--warning)]">사내 공식 계산값과 대조 확인 필요</p>
                 </div>
               </div>
 

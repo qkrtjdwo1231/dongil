@@ -20,7 +20,8 @@ import type {
   OrderRecord,
   OrderStatus,
   Role,
-  StaffMenu
+  StaffMenu,
+  UploadImportResult
 } from "@/lib/types";
 
 const staffMenus: Array<{ id: StaffMenu; label: string }> = [
@@ -66,33 +67,30 @@ export function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const data = await loadDashboardData();
-        setOrders(data.orders);
-        setItems(data.items);
-        setFavorites(data.favorites);
-        setCustomers(synthesizeCustomers(data.customers, data.orders));
-      } catch {
-        setNotice("초기 데이터를 불러오는 중 문제가 발생해 일부 화면은 샘플 데이터로 보일 수 있습니다.");
-      } finally {
-        setLoading(false);
-      }
-    }
+  const reloadDashboard = async (nextNotice?: string) => {
+    setLoading(true);
 
-    void loadData();
+    try {
+      const data = await loadDashboardData();
+      setOrders(data.orders);
+      setItems(data.items);
+      setFavorites(data.favorites);
+      setCustomers(synthesizeCustomers(data.customers, data.orders));
+      setNotice(nextNotice ?? null);
+    } catch {
+      setNotice("초기 데이터를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void reloadDashboard();
   }, []);
 
   const handleOrderCreated = (order: OrderRecord) => {
     setOrders((current) => [order, ...current]);
     setCustomers((current) => synthesizeCustomers(current, [order]));
-  };
-
-  const handleOrdersImported = (importedOrders: OrderRecord[]) => {
-    setOrders((current) => [...importedOrders, ...current]);
-    setCustomers((current) => synthesizeCustomers(current, importedOrders));
   };
 
   const handleFavoriteCreated = (favorite: FavoriteRecord) => {
@@ -103,6 +101,12 @@ export function StaffDashboard() {
     setPresetDraft(favoriteToDraft(favorite));
     setPresetVersion((current) => current + 1);
     setMenu("basic");
+  };
+
+  const handleImportComplete = async (result: UploadImportResult) => {
+    await reloadDashboard(
+      `${result.insertedRows.toLocaleString()}건 업로드를 완료했습니다. 유효 ${result.validRows.toLocaleString()}건, 검토 필요 ${result.invalidRows.toLocaleString()}건`
+    );
   };
 
   const handleOrderStatusChange = async (id: string, status: OrderStatus) => {
@@ -117,12 +121,11 @@ export function StaffDashboard() {
   };
 
   const renderContent = () => {
-    // TODO: 추후 팀장/대표 대시보드 구현
     if (role === "팀장") {
       return (
         <PlaceholderPanel
           title="팀장 화면"
-          message="팀장 화면은 추후 오늘 할 일, 납기 임박, 진행 현황을 표시할 예정입니다."
+          message="팀장 화면은 추후 오늘 일정 확인, 진행 현황 요약을 표시하는 영역으로 확장할 예정입니다."
         />
       );
     }
@@ -131,14 +134,14 @@ export function StaffDashboard() {
       return (
         <PlaceholderPanel
           title="대표 화면"
-          message="대표 화면은 추후 전체 주문 현황, 거래처별 주문량, 납기 지연 현황을 표시할 예정입니다."
+          message="대표 화면은 추후 전체 주문 현황, 거래처별 주문량 등의 요약 지표를 표시하는 영역으로 확장할 예정입니다."
         />
       );
     }
 
     switch (menu) {
       case "import":
-        return <ExistingDataUploadPanel onOrdersImported={handleOrdersImported} />;
+        return <ExistingDataUploadPanel onImportComplete={handleImportComplete} />;
       case "basic":
         return (
           <BasicOrderForm
@@ -215,7 +218,7 @@ export function StaffDashboard() {
       <main className="mx-auto max-w-7xl px-6 py-6">
         {!supabaseConfig.isConfigured ? (
           <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
-            Supabase 환경변수가 설정되지 않았습니다. .env.local을 확인하세요.
+            Supabase 환경변수가 설정되지 않았습니다. `.env.local`을 확인해 주세요.
           </div>
         ) : null}
 
@@ -239,11 +242,10 @@ export function StaffDashboard() {
               직원용 업무 대시보드
             </p>
             <h2 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
-              엑셀 대신 흐름대로 등록하는 작업관리 화면
+              작업 흐름 중심으로 등록하는 작업관리 화면
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기 기반 재등록이 쉬운 구조로
-              진행합니다.
+              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기 기반 재등록이 자연스럽게 이어지도록 구성했습니다.
             </p>
           </div>
         </section>

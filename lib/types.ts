@@ -8,7 +8,7 @@ export type StaffMenu =
   | "favorites"
   | "needs-check";
 
-export type ProcessType = "복층" | "강화" | "접합" | "창호" | "기타";
+export type ProcessType = string;
 
 export type OrderStatus = "등록" | "확인필요" | "진행" | "완료" | "보류";
 
@@ -128,4 +128,19 @@ export type UploadPreviewRow = {
   draft: ImportedOrderDraft;
   valid: boolean;
   reason?: string;
+};
+
+export type UploadPreviewSummary = {
+  fileName: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  previewRows: UploadPreviewRow[];
+};
+
+export type UploadImportResult = {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  insertedRows: number;
 };

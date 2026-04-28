@@ -28,14 +28,14 @@ export function parseQuickOrderText(input: string): QuickParseResult {
     remaining = remaining.replace(sizeMatch[0], " ");
   }
 
-  const quantityMatch = remaining.match(/(\d+)\s*(장|개)/);
+  const quantityMatch = remaining.match(/(\d+)\s*(장|개)?/);
   const quantity = quantityMatch ? Number(quantityMatch[1]) : null;
   if (quantityMatch) {
     remaining = remaining.replace(quantityMatch[0], " ");
   }
 
-  const lineMatch = remaining.match(/(\d+\s*라인)/);
-  const line = lineMatch ? lineMatch[1].replace(/\s+/g, "") : null;
+  const lineMatch = remaining.match(/(\d+\s*-?\s*line|\d+\s*라인)/i);
+  const line = lineMatch ? lineMatch[1].replace(/\s+/g, "").toUpperCase() : null;
   if (lineMatch) {
     remaining = remaining.replace(lineMatch[0], " ");
   }
@@ -52,5 +52,3 @@ export function parseQuickOrderText(input: string): QuickParseResult {
     originalText
   };
 }
-
-// TODO: 추후 AI API 연결

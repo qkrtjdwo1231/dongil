@@ -65,7 +65,7 @@ export function FavoritesPanel({
         {!favorites.length ? (
           <EmptyState
             title="저장된 즐겨찾기가 아직 없습니다"
-            description="기본 등록 화면에서 자주 쓰는 조합을 저장하면 이곳에서 빠르게 다시 사용할 수 있습니다."
+            description="기본 등록 화면에서 자주 쓰는 조합을 저장하면 여기에서 빠르게 다시 사용할 수 있습니다."
           />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
@@ -92,9 +92,7 @@ export function FavoritesPanel({
                   ])}
                 </p>
 
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  기본 수량: {favorite.quantity ?? "미지정"}
-                </p>
+                <p className="mt-2 text-sm text-[var(--muted)]">기본 수량: {favorite.quantity ?? "미지정"}</p>
 
                 {favorite.memo ? (
                   <p className="mt-3 rounded-2xl bg-[#f8fafb] px-3 py-2 text-sm text-[var(--muted)]">
@@ -136,7 +134,7 @@ export function FavoritesPanel({
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(24,39,56,0.2)]">
               <h3 className="text-lg font-bold text-[var(--foreground)]">수량 입력 후 바로 등록</h3>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                {quantityModal.name} 즐겨찾기에는 기본 수량이 없어 직접 입력이 필요합니다.
+                {quantityModal.name} 즐겨찾기는 기본 수량이 없어서 직접 입력이 필요합니다.
               </p>
               <div className="mt-5">
                 <QuantityInput value={quantity} onChange={setQuantity} min={1} />

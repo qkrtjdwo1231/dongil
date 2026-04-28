@@ -113,7 +113,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
       count: 1
     });
     setQuantity(latestOrder.quantity);
-    setMessage("직전 주문을 빠른 등록 기준값으로 불러왔습니다.");
+    setMessage("직전 주문을 빠른 등록 기본값으로 불러왔습니다.");
     setError(null);
   };
 
@@ -157,7 +157,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
   return (
     <SectionCard
       title="빠른 등록"
-      description="기존 거래처와 현장, 자주 쓰는 품목 조합을 선택해 수량만 바꿔 빠르게 등록합니다."
+      description="기존 거래처와 현장, 자주 쓰는 품목 조합을 선택하고 수량만 바꿔 빠르게 등록합니다."
       action={<RecentOrderButton onClick={handleLatestOrder} disabled={!latestOrder} />}
     >
       <div className="space-y-5">
@@ -231,7 +231,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
                     </button>
                   ))
                 ) : (
-                  <p className="text-sm text-[var(--muted)]">거래처를 선택하면 최근 현장이 표시됩니다.</p>
+                  <p className="text-sm text-[var(--muted)]">거래처를 선택하면 최근 현장을 보여줍니다.</p>
                 )}
               </div>
             </div>
@@ -255,7 +255,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
           <div className="rounded-2xl border border-black/5 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--foreground)]">자주 쓰는 품목 조합</p>
-              <span className="text-xs text-[var(--muted)]">최근 사용 횟수 기반</span>
+              <span className="text-xs text-[var(--muted)]">최근 사용 횟수 기준</span>
             </div>
 
             {selectedCustomer && selectedSite ? (
@@ -281,16 +281,14 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
                       {card.width && card.height ? `${card.width} x ${card.height}` : "규격 미입력"}
                     </p>
                     <p className="mt-1 text-sm text-[var(--muted)]">{card.line ?? "라인 미입력"}</p>
-                    <p className="mt-3 text-xs font-semibold text-[var(--primary)]">
-                      최근 {card.count}회 사용
-                    </p>
+                    <p className="mt-3 text-xs font-semibold text-[var(--primary)]">최근 {card.count}회 사용</p>
                   </button>
                 ))}
               </div>
             ) : (
               <EmptyState
                 title="거래처와 현장을 먼저 선택해 주세요"
-                description="선택한 거래처와 현장에서 자주 쓰인 품목 조합 카드를 여기에 표시합니다."
+                description="선택한 거래처와 현장에서 자주 쓰인 품목 조합 카드를 여기에 보여줍니다."
               />
             )}
 
@@ -300,8 +298,8 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
                   title="추천 가능한 조합이 없습니다"
                   description={
                     items.length
-                      ? "이 현장의 등록 이력이 아직 적습니다. 다른 현장을 선택하거나 기본 등록을 이용해 주세요."
-                      : "아직 품목/주문 데이터가 충분하지 않습니다."
+                      ? "해당 현장의 주문 이력이 아직 적습니다. 다른 현장을 선택하거나 기본 등록 화면을 이용해 주세요."
+                      : "아직 품목 또는 주문 데이터가 충분하지 않습니다."
                   }
                 />
               </div>
