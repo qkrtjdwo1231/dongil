@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "동일유리 작업관리",
-  description: "동일유리 내부 주문 및 작업 등록을 위한 업무용 웹앱 MVP"
+  description: "동일유리의 주문 등록, 업로드 분석, 팀장/대표용 대시보드를 위한 내부 업무 시스템"
 };
 
 export default function RootLayout({

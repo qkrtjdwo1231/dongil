@@ -1,27 +1,14 @@
-# 동일유리 작업관리
+﻿# 동일유리 작업관리
 
-청주 소재 유리/창호 제조·시공 업체의 내부 엑셀 등록 업무를 웹 UI 중심으로 전환하기 위한 직원용 MVP입니다.
+동일유리의 주문/업로드/분석 업무를 웹으로 관리하는 내부용 Next.js 앱입니다.
 
-## 현재 진행 상태
+현재 구조는 세 가지 역할 화면을 함께 제공합니다.
 
-- Step 1 `idea.md` 작성 완료
-- Step 2 `PRD.md` 작성 완료
-- Step 3 PRD 검토 및 확정 완료
-- Step 4 `STRUCTURE.md` 작성 완료
-- Step 5 `TASK.md` 작성 완료
-- Step 6 개발 진행 중
+- 직원: 기존 등록/빠른 등록/업로드 보조 화면
+- 팀장: 팀 관리 콘솔, 프로젝트/일정/작업자 현황 중심 화면
+- 대표: 생산실적 분석 시스템, 업로드 기반 KPI/다차원 분석/목표/AI 분석 화면
 
-## 개발 환경
-
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- XLSX 파일 파싱
-- Supabase
-- Vercel
-- npm
-
-## 실행 준비
+## 실행 방법
 
 1. `npm install`
 2. `.env.local` 생성
@@ -34,43 +21,66 @@
 9. 환경변수 등록
 10. 배포 확인
 
-## 주요 기능
-
-- 파일 업로드
-- 기본 등록
-- 빠른 등록
-- 주문 목록 검색 및 상태 변경
-- 체크리스트
-- 즐겨찾기 저장, 불러오기, 바로 등록
-- 직전 주문 불러오기
-
-## 파일 업로드 사용 방법
-
-1. `파일 업로드` 탭으로 이동
-2. `.xlsx`, `.xls`, `.csv` 파일 선택
-3. 미리보기에서 유효 행과 검토 필요 행 확인
-4. `유효 행 N건 저장` 버튼으로 주문 일괄 등록
-
-거래처, 품명, 수량이 없는 행은 업로드 미리보기에서 검토 필요로 표시됩니다.
-
-## 환경변수
+## 주요 환경변수
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_UPLOAD_BUCKET=uploads
+GEMINI_API_KEY=
 ```
 
-## GitHub 업로드 시 제외
+## 현재 주요 기능
+
+### 공통
+- 역할 전환 UI
+- Supabase 미설정 시 안전한 안내 메시지
+- 업로드/분석/주문 데이터 공통 로딩
+
+### 직원
+- 기본 등록
+- 빠른 등록
+- 주문 목록
+- 체크리스트
+- 즐겨찾기
+- 파일 업로드
+
+### 팀장
+- 대시보드
+- 프로젝트
+- 일정
+- 팀 관리
+- 설정
+- PID/거래처/현장/품명/등록자 검색 기반 운영
+
+### 대표
+- 대시보드
+- 다차원 분석
+- 목표 설정
+- 데이터 그리드
+- 데이터 임포트
+- AI 분석
+- 설정
+- 업로드한 파일과 저장된 생산실적 데이터 기반 분석
+
+## 업로드/AI 관련
+
+- 업로드 파일은 Storage에 저장됩니다.
+- 업로드 행은 `uploaded_rows`에 저장됩니다.
+- `pid`와 원본 행 전체 `raw_payload`를 함께 보존합니다.
+- AI 답변과 추천은 업로드된 파일과 저장된 데이터만 기준으로 생성합니다.
+
+## 배포 메모
+
+- Framework Preset: `Next.js`
+- Vercel 환경변수에도 아래 값을 직접 등록해야 합니다.
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_UPLOAD_BUCKET`
+  - `GEMINI_API_KEY`
+
+## GitHub 제외 파일
 
 - `.env.local`
 - `node_modules`
 - `.next`
-
-## Vercel 배포 메모
-
-- Framework Preset은 `Next.js`
-- Root Directory는 저장소 루트
-- 환경변수는 Vercel 프로젝트 설정에서 직접 등록
-- 등록할 값
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`

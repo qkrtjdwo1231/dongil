@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { gemini } from "@/lib/gemini";
+import { generateGeminiText } from "@/lib/gemini";
 import {
   buildRecommendationPrompt,
   buildSearchContext,
@@ -54,7 +54,10 @@ function parseRecommendationPayload(rawText: string): Pick<OrderRecommendRespons
   const suggestion = (parsed.suggestion ?? {}) as Record<string, unknown>;
 
   return {
-    summary: typeof parsed.summary === "string" && parsed.summary.trim() ? parsed.summary.trim() : "업로드 데이터 기준 추천 결과입니다.",
+    summary:
+      typeof parsed.summary === "string" && parsed.summary.trim()
+        ? parsed.summary.trim()
+        : "업로드 데이터 기준 추천 결과입니다.",
     suggestion: {
       customer: typeof suggestion["customer"] === "string" ? (suggestion["customer"] as string) : null,
       site: typeof suggestion["site"] === "string" ? (suggestion["site"] as string) : null,
@@ -162,12 +165,8 @@ export async function POST(request: Request) {
     }
 
     const prompt = buildRecommendationPrompt(mode, currentInput, question, contexts, memoryRules);
-    const aiResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt
-    });
-
-    const recommendation = parseRecommendationPayload(aiResponse.text ?? "");
+    const aiResponse = await generateGeminiText(prompt);
+    const recommendation = parseRecommendationPayload(aiResponse.text || "");
     const usedFiles = buildUsedFileSummaries(contexts);
 
     return NextResponse.json({
@@ -177,11 +176,12 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "업로드 기반 추천 생성 중 오류가 발생했습니다."
+        error:
+          error instanceof Error
+            ? error.message
+            : "업로드 기반 추천 생성 중 오류가 발생했습니다."
       },
       { status: 500 }
     );
   }
 }
-
-

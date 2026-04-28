@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
-import { gemini } from "@/lib/gemini";
+﻿import { NextResponse } from "next/server";
+import { generateGeminiText } from "@/lib/gemini";
 
 export async function GET() {
   try {
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: "청주 유리 작업관리 앱 테스트라고 한 줄로 말해줘.",
-    });
+    const response = await generateGeminiText(
+      "청주 유리 작업관리 앱 테스트라고 한 줄로 말해줘."
+    );
 
     return NextResponse.json({
       ok: true,
@@ -16,7 +15,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        message: "Gemini 호출 중 오류가 발생했습니다.",
+        message: error instanceof Error ? error.message : "Gemini 호출 중 오류가 발생했습니다.",
       },
       { status: 500 }
     );

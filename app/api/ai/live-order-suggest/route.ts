@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { gemini } from "@/lib/gemini";
+import { generateGeminiText } from "@/lib/gemini";
 import {
   buildLiveSuggestionPrompt,
   buildSearchContext,
@@ -69,11 +69,20 @@ function parseLiveSuggestions(rawText: string): LiveSuggestionItem[] {
   return (parsed.suggestions ?? [])
     .slice(0, 4)
     .map((item) => ({
-      label: typeof item["label"] === "string" && item["label"].trim() ? (item["label"] as string).trim() : "추천 후보",
-      reason: typeof item["reason"] === "string" && item["reason"].trim() ? (item["reason"] as string).trim() : "업로드 데이터 기준 관련도가 높습니다.",
+      label:
+        typeof item["label"] === "string" && item["label"].trim()
+          ? (item["label"] as string).trim()
+          : "추천 후보",
+      reason:
+        typeof item["reason"] === "string" && item["reason"].trim()
+          ? (item["reason"] as string).trim()
+          : "업로드 데이터 기준 관련도가 높습니다.",
       suggestion: normalizeSuggestion(item["suggestion"])
     }))
-    .filter((item) => item.suggestion.item_name || item.suggestion.customer || item.suggestion.site || item.suggestion.line);
+    .filter(
+      (item) =>
+        item.suggestion.item_name || item.suggestion.customer || item.suggestion.site || item.suggestion.line
+    );
 }
 
 async function loadMemoryRules(supabase: SupabaseClient) {
@@ -181,22 +190,20 @@ export async function POST(request: Request) {
     }
 
     const prompt = buildLiveSuggestionPrompt(input, contexts, memoryRules);
-    const aiResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt
-    });
-
-    const suggestions = parseLiveSuggestions(aiResponse.text ?? "");
+    const aiResponse = await generateGeminiText(prompt);
+    const suggestions = parseLiveSuggestions(aiResponse.text || "");
     const usedFiles = buildUsedFileSummaries(contexts);
 
     return NextResponse.json({ suggestions, usedFiles });
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "실시간 문장 추천 생성 중 오류가 발생했습니다."
+        error:
+          error instanceof Error
+            ? error.message
+            : "실시간 문장 추천 생성 중 오류가 발생했습니다."
       },
       { status: 500 }
     );
   }
 }
-

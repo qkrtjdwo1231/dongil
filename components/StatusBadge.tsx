@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@/lib/types";
+﻿import type { OrderStatus } from "@/lib/types";
 
 const statusStyles: Record<OrderStatus, string> = {
   등록: "bg-slate-100 text-slate-700",

@@ -1,12 +1,15 @@
-﻿export type Role = "직원" | "팀장" | "대표";
+﻿export type Role = "팀장" | "대표";
 
-export type StaffMenu =
+export type TeamLeadMenu = "dashboard" | "projects" | "schedule" | "teams" | "settings";
+
+export type ExecutiveMenu =
+  | "dashboard"
+  | "analysis"
+  | "targets"
+  | "data-grid"
   | "import"
-  | "basic"
-  | "quick"
-  | "orders"
-  | "favorites"
-  | "needs-check";
+  | "ai-analysis"
+  | "settings";
 
 export type ProcessType = string;
 
@@ -69,22 +72,6 @@ export type ItemRecord = {
   height: number | null;
   default_quantity: number | null;
   memo: string | null;
-};
-
-export type BasicOrderDraft = {
-  customer: string;
-  site: string;
-  process: ProcessType | "";
-  item_code: string;
-  item_name: string;
-  width: number | null;
-  height: number | null;
-  quantity: number;
-  line: string;
-  request_no: string;
-  registrant: string;
-  memo: string;
-  status: OrderStatus;
 };
 
 export type QuickParseResult = {

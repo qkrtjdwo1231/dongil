@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { gemini } from "@/lib/gemini";
+import { generateGeminiText } from "@/lib/gemini";
 import {
   buildPromptFromSearchContexts,
   buildSearchContext,
@@ -131,12 +131,8 @@ export async function POST(request: Request) {
     }
 
     const prompt = buildPromptFromSearchContexts(question, contexts, memoryRules);
-    const aiResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt
-    });
-
-    const answer = stripMarkdown(aiResponse.text ?? "답변을 생성하지 못했습니다.");
+    const aiResponse = await generateGeminiText(prompt);
+    const answer = stripMarkdown(aiResponse.text || "답변을 생성하지 못했습니다.");
     const usedFiles = buildUsedFileSummaries(contexts);
     const usedFileIds = usedFiles.map((file) => file.id).filter(Boolean);
     const usedRowIds = contexts.flatMap((context) => context.rows.map((row) => row.id));
@@ -164,4 +160,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

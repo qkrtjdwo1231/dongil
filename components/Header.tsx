@@ -1,4 +1,4 @@
-import { RoleSwitcher } from "@/components/RoleSwitcher";
+﻿import { RoleSwitcher } from "@/components/RoleSwitcher";
 import type { Role } from "@/lib/types";
 
 type HeaderProps = {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { SectionCard } from "@/components/SectionCard";
@@ -23,7 +23,7 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
     return orders.filter((order) => {
       const matchesStatus = status === "전체" ? true : order.status === status;
       const matchesSearch = keyword
-        ? [order.customer, order.site, order.item_name, order.item_code]
+        ? [order.customer, order.site, order.item_name, order.item_code, order.pid]
             .filter(Boolean)
             .some((value) => String(value).toLowerCase().includes(keyword))
         : true;
@@ -33,16 +33,13 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
   }, [orders, search, status]);
 
   return (
-    <SectionCard
-      title="주문 목록"
-      description="등록된 주문을 검색하고 상태를 바꾸거나 상세 정보를 빠르게 확인할 수 있습니다."
-    >
+    <SectionCard title="주문 목록" description="등록된 주문을 검색하고 상태를 바꾸거나 상세 정보를 빠르게 확인할 수 있습니다.">
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="거래처, 현장, 품명, 품목코드 검색"
+            placeholder="거래처, 현장, 품명, 품목코드, PID 검색"
             className="min-w-[18rem] flex-1 rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
           />
           <div className="flex flex-wrap gap-2">
@@ -53,9 +50,7 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
                 onClick={() => setStatus(option)}
                 className={[
                   "rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                  status === option
-                    ? "bg-[var(--primary)] text-white"
-                    : "bg-[#f4f7fb] text-[var(--foreground)]"
+                  status === option ? "bg-[var(--primary)] text-white" : "bg-[#f4f7fb] text-[var(--foreground)]"
                 ].join(" ")}
               >
                 {option}
@@ -93,15 +88,9 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
             </thead>
             <tbody>
               {filteredOrders.map((order) => (
-                <tr
-                  key={order.id}
-                  onClick={() => setSelectedOrder(order)}
-                  className="cursor-pointer border-t border-black/5 hover:bg-[#f9fbfc]"
-                >
+                <tr key={order.id} onClick={() => setSelectedOrder(order)} className="cursor-pointer border-t border-black/5 hover:bg-[#f9fbfc]">
                   <td className="px-3 py-3">{formatDateTime(order.created_at)}</td>
-                  <td className="px-3 py-3">
-                    <StatusBadge status={order.status} />
-                  </td>
+                  <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
                   <td className="px-3 py-3 font-semibold text-[var(--foreground)]">{order.customer}</td>
                   <td className="px-3 py-3">{order.site ?? "-"}</td>
                   <td className="px-3 py-3">{order.process ?? "-"}</td>
@@ -130,10 +119,9 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                   {joinText([
                     selectedOrder.site,
-                    selectedOrder.width && selectedOrder.height
-                      ? `${selectedOrder.width} x ${selectedOrder.height}`
-                      : null,
-                    selectedOrder.line
+                    selectedOrder.width && selectedOrder.height ? `${selectedOrder.width} x ${selectedOrder.height}` : null,
+                    selectedOrder.line,
+                    selectedOrder.pid
                   ])}
                 </p>
               </div>
@@ -148,9 +136,7 @@ export function OrderList({ orders, onStatusChange }: OrderListProps) {
                   onClick={() => onStatusChange(selectedOrder.id, option)}
                   className={[
                     "rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                    selectedOrder.status === option
-                      ? "bg-[var(--primary)] text-white"
-                      : "bg-[#f4f7fb] text-[var(--foreground)]"
+                    selectedOrder.status === option ? "bg-[var(--primary)] text-white" : "bg-[#f4f7fb] text-[var(--foreground)]"
                   ].join(" ")}
                 >
                   {option}
