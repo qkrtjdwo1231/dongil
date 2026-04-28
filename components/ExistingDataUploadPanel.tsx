@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionCard } from "@/components/SectionCard";
 import type { UploadImportResult, UploadPreviewSummary } from "@/lib/types";
+
+const UPLOAD_HISTORY_STORAGE_KEY = "existing-data-upload-history";
 
 type ExistingDataUploadPanelProps = {
   onImportComplete: (result: UploadImportResult) => Promise<void> | void;
@@ -39,6 +41,50 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const saved = window.localStorage.getItem(UPLOAD_HISTORY_STORAGE_KEY);
+      if (!saved) {
+        return;
+      }
+
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      const normalized = parsed
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .slice(0, 20);
+
+      if (normalized.length) {
+        setUploadedFileNames(normalized);
+        setSelectedFileName((current) => current ?? normalized[0]);
+      }
+    } catch {
+      // Ignore invalid localStorage payloads and continue with empty history.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        UPLOAD_HISTORY_STORAGE_KEY,
+        JSON.stringify(uploadedFileNames.slice(0, 20))
+      );
+    } catch {
+      // Ignore storage write failures (private mode/quota) without blocking upload flow.
+    }
+  }, [uploadedFileNames]);
 
   const handleFileSelect = async (file: File | null) => {
     if (!file) {
@@ -91,7 +137,10 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
     try {
       const result = await postUpload<UploadImportResult>("/api/upload/import", selectedFile);
       await onImportComplete(result);
-      setMessage(`${result.insertedRows.toLocaleString()}건 저장이 완료되었습니다.`);
+      const storageNote = result.storedFilePath
+        ? ` (stored: ${result.storedFileBucket}/${result.storedFilePath})`
+        : "";
+      setMessage(`${result.insertedRows.toLocaleString()}건 저장이 완료되었습니다.${storageNote}`);
     } catch (uploadError) {
       setError(
         uploadError instanceof Error

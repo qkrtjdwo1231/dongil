@@ -15,6 +15,47 @@ function createSupabaseServerClient() {
   return createClient(url, anonKey);
 }
 
+function sanitizeFileName(fileName: string) {
+  const trimmed = fileName.trim();
+  const fallback = "upload-file";
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return trimmed
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || fallback;
+}
+
+async function saveUploadSourceFile(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  file: File,
+  buffer: ArrayBuffer
+) {
+  if (!supabase) {
+    throw new Error("Supabase client is not configured.");
+  }
+
+  const bucket = process.env.SUPABASE_UPLOAD_BUCKET || "uploads";
+  const today = new Date().toISOString().slice(0, 10);
+  const safeFileName = sanitizeFileName(file.name);
+  const objectPath = `imports/${today}/${crypto.randomUUID()}-${safeFileName}`;
+  const uploadResponse = await supabase.storage.from(bucket).upload(objectPath, buffer, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false
+  });
+
+  if (uploadResponse.error) {
+    throw new Error(`Failed to store uploaded file: ${uploadResponse.error.message}`);
+  }
+
+  return {
+    bucket,
+    path: objectPath
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -33,6 +74,7 @@ export async function POST(request: Request) {
     }
 
     const buffer = await file.arrayBuffer();
+    const storedFile = await saveUploadSourceFile(supabase, file, buffer);
     const result = await importWorkbookInBatches(buffer, async (rows) => {
       const response = await supabase.from("orders").insert(rows);
 
@@ -41,7 +83,11 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      storedFileBucket: storedFile.bucket,
+      storedFilePath: storedFile.path
+    });
   } catch (error) {
     return NextResponse.json(
       {

@@ -143,4 +143,6 @@ export type UploadImportResult = {
   validRows: number;
   invalidRows: number;
   insertedRows: number;
+  storedFileBucket?: string;
+  storedFilePath?: string;
 };
