@@ -163,7 +163,7 @@ export async function POST(request: Request) {
 
     const prompt = buildRecommendationPrompt(mode, currentInput, question, contexts, memoryRules);
     const aiResponse = await gemini.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt
     });
 
@@ -183,4 +183,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
