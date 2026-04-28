@@ -37,6 +37,13 @@ a {
   text-decoration: none;
 }
 
+button:not(:disabled),
+a,
+[role="button"],
+label:has(input[type="file"]) {
+  cursor: pointer;
+}
+
 button,
 input,
 select,

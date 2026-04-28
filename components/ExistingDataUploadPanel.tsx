@@ -17,7 +17,12 @@ async function postUpload<T>(url: string, file: File) {
     body: formData
   });
 
-  const payload = (await response.json()) as T & { error?: string };
+  const contentType = response.headers.get("content-type") ?? "";
+  const rawText = await response.text();
+  const payload = contentType.includes("application/json")
+    ? ((rawText ? JSON.parse(rawText) : {}) as T & { error?: string })
+    : ({ error: rawText || "업로드 요청에 실패했습니다." } as T & { error?: string });
+
   if (!response.ok) {
     throw new Error(payload.error ?? "업로드 요청에 실패했습니다.");
   }
@@ -28,6 +33,7 @@ async function postUpload<T>(url: string, file: File) {
 export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUploadPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [uploadedFileNames, setUploadedFileNames] = useState<string[]>([]);
   const [summary, setSummary] = useState<UploadPreviewSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,6 +56,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
     try {
       const preview = await postUpload<UploadPreviewSummary>("/api/upload/preview", file);
       setSummary(preview);
+      setUploadedFileNames((current) => [file.name, ...current.filter((name) => name !== file.name)]);
       setMessage(
         `파일 분석이 완료되었습니다. 총 ${preview.totalRows.toLocaleString()}행 중 유효 행 ${preview.validRows.toLocaleString()}건`
       );
@@ -84,9 +91,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
     try {
       const result = await postUpload<UploadImportResult>("/api/upload/import", selectedFile);
       await onImportComplete(result);
-      setMessage(
-        `${result.insertedRows.toLocaleString()}건 저장이 완료되었습니다.`
-      );
+      setMessage(`${result.insertedRows.toLocaleString()}건 저장이 완료되었습니다.`);
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
@@ -106,21 +111,18 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
       description="기존 엑셀 관리 데이터를 서버에서 읽어 요약과 미리보기를 만든 뒤 배치 단위로 저장합니다."
     >
       <div className="space-y-6">
-        <div className="rounded-2xl border border-dashed border-[var(--primary)]/20 bg-[var(--secondary)]/70 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="max-w-3xl space-y-2">
-              <h3 className="text-base font-semibold text-[var(--foreground)]">엑셀 파일 업로드</h3>
-              <p className="text-sm leading-6 text-[var(--muted)]">
-                첫 번째 시트 기준으로 파일을 읽고, 거래처와 품명, 수량이 있는 행만 주문 데이터로 저장합니다.
-              </p>
-              <p className="text-xs leading-5 text-[var(--muted)]">
-                대용량 파일은 브라우저가 아니라 서버에서 분석하고, 저장은 여러 번에 나눠 배치로 처리합니다.
-              </p>
-              {selectedFileName ? (
-                <p className="text-xs font-medium text-[var(--primary)]">선택 파일: {selectedFileName}</p>
-              ) : null}
+        <div className="rounded-2xl border border-dashed border-[var(--primary)]/20 bg-[var(--secondary)]/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h3 className="text-base font-semibold text-[var(--foreground)]">엑셀 파일 업로드</h3>
+                <span className="text-xs text-[var(--muted)]">
+                  첫 번째 시트 기준으로 파일을 읽고, 거래처와 품명, 수량이 있는 행만 주문 데이터로 저장합니다.
+                </span>
+              </div>
             </div>
-            <label className="inline-flex cursor-pointer items-center rounded-2xl bg-[var(--foreground)] px-4 py-2.5 text-sm font-semibold text-white">
+
+            <label className="inline-flex shrink-0 items-center rounded-2xl bg-[var(--foreground)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
               파일 선택
               <input
                 type="file"
@@ -130,6 +132,35 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
               />
             </label>
           </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--primary)]/10 pt-4">
+            <span className="text-xs font-semibold text-[var(--muted)]">업로드 파일</span>
+            {uploadedFileNames.length ? (
+              uploadedFileNames.map((fileName) => {
+                const active = fileName === selectedFileName;
+
+                return (
+                  <span
+                    key={fileName}
+                    title={fileName}
+                    className={`max-w-full truncate rounded-full px-3 py-1 text-xs font-medium ${
+                      active
+                        ? "bg-[var(--primary)] text-white"
+                        : "bg-white text-[var(--foreground)] ring-1 ring-black/5"
+                    }`}
+                  >
+                    {fileName}
+                  </span>
+                );
+              })
+            ) : (
+              <span className="text-xs text-[var(--muted)]">아직 업로드한 파일이 없습니다.</span>
+            )}
+          </div>
+
+          <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+            대용량 파일은 브라우저가 아니라 서버에서 분석하고, 저장은 여러 번에 나눠 배치로 처리합니다.
+          </p>
         </div>
 
         {loading ? (
@@ -178,7 +209,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
               type="button"
               onClick={handleImport}
               disabled={saving || !summary?.validRows}
-              className="mt-6 w-full rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 w-full rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving
                 ? "배치 저장 중..."
