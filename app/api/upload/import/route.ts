@@ -1,6 +1,11 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { importWorkbookInBatches } from "@/lib/upload-processing";
+import {
+  buildOrderInsertRows,
+  buildUploadedRowInsertRows,
+  extractWorkbookData,
+  insertRowsInBatches
+} from "@/lib/upload-processing";
 
 export const runtime = "nodejs";
 
@@ -75,16 +80,68 @@ export async function POST(request: Request) {
 
     const buffer = await file.arrayBuffer();
     const storedFile = await saveUploadSourceFile(supabase, file, buffer);
-    const result = await importWorkbookInBatches(buffer, async (rows) => {
-      const response = await supabase.from("orders").insert(rows);
+    const extraction = extractWorkbookData(buffer, file.name);
 
+    const fileInsert = await supabase
+      .from("uploaded_files")
+      .insert({
+        original_name: file.name,
+        stored_bucket: storedFile.bucket,
+        stored_path: storedFile.path,
+        sheet_name: extraction.sheetName,
+        total_rows: extraction.totalRows,
+        parsed_rows: extraction.parsedRows.length,
+        status: "processing",
+        header_snapshot: extraction.headers,
+        summary_text: `총 ${extraction.totalRows}행, 유효 ${extraction.validRows}건, 검토 필요 ${extraction.invalidRows}건`
+      })
+      .select("id")
+      .single();
+
+    if (fileInsert.error || !fileInsert.data) {
+      throw new Error(fileInsert.error?.message ?? "uploaded_files 저장에 실패했습니다.");
+    }
+
+    const uploadedFileId = fileInsert.data.id as string;
+    const uploadedRows = buildUploadedRowInsertRows(uploadedFileId, extraction.parsedRows);
+    const orderRows = buildOrderInsertRows(extraction.parsedRows);
+
+    await insertRowsInBatches(uploadedRows, async (rows) => {
+      const response = await supabase.from("uploaded_rows").insert(rows);
       if (response.error) {
         throw new Error(response.error.message);
       }
     });
 
+    if (orderRows.length) {
+      await insertRowsInBatches(orderRows, async (rows) => {
+        const response = await supabase.from("orders").insert(rows);
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+      });
+    }
+
+    const statusUpdate = await supabase
+      .from("uploaded_files")
+      .update({
+        status: "completed",
+        parsed_rows: extraction.parsedRows.length,
+        summary_text: `총 ${extraction.totalRows}행, 유효 ${extraction.validRows}건, 검토 필요 ${extraction.invalidRows}건`
+      })
+      .eq("id", uploadedFileId);
+
+    if (statusUpdate.error) {
+      throw new Error(statusUpdate.error.message);
+    }
+
     return NextResponse.json({
-      ...result,
+      totalRows: extraction.totalRows,
+      validRows: extraction.validRows,
+      invalidRows: extraction.invalidRows,
+      insertedRows: orderRows.length,
+      insertedUploadRows: uploadedRows.length,
+      uploadedFileId,
       storedFileBucket: storedFile.bucket,
       storedFilePath: storedFile.path
     });

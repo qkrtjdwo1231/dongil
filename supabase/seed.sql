@@ -52,3 +52,9 @@ insert into public.favorites (
 values
   ('OO건설 청주A 기본', '복층', 'DG-001', '복층유리', 1200, 1800, 30, 'OO건설', '청주A현장', '2라인', '자주 쓰는 기본 조합'),
   ('청주창호 강화 기본', '강화', 'DG-002', '강화유리', 900, 1200, 20, '청주창호', '오창B현장', '1라인', '반복 등록용');
+insert into public.ai_memory_rules (title, category, content, priority, is_active)
+values
+  ('업로드 데이터 우선 답변', 'answer_policy', '모든 답변과 추천은 업로드한 파일과 저장된 업로드 데이터만 근거로 작성한다. 확인되지 않는 내용은 추측하지 않는다.', 10, true),
+  ('PID 우선 표기', 'field_priority', '질문과 관련된 행을 설명할 때 PID가 있으면 거래처나 품명보다 먼저 함께 보여준다.', 20, true),
+  ('실무형 답변 형식', 'answer_style', '답변이 길어질 경우 먼저 핵심 결론을 짧게 제시하고, 그 다음 근거 행이나 검토 포인트를 정리한다.', 30, true)
+on conflict do nothing;

@@ -1,10 +1,11 @@
-import * as XLSX from "xlsx";
+﻿import * as XLSX from "xlsx";
 import { calculateAreaPyeong } from "@/lib/calculations";
 import type {
   ImportedOrderDraft,
   OrderStatus,
   ProcessType,
-  UploadPreviewRow
+  UploadPreviewRow,
+  UploadPreviewSummary
 } from "@/lib/types";
 
 const PROCESS_VALUES = new Set(["복층", "강화", "접합", "창호", "기타"]);
@@ -40,13 +41,18 @@ type ParsedUploadRow = {
   no: string | null;
   valid: boolean;
   reason?: string;
+  rawPayload: Record<string, string>;
+  normalizedText: string;
 };
 
-export type UploadPreviewSummary = {
+type UploadExtraction = {
   fileName: string;
+  sheetName: string | null;
+  headers: string[];
   totalRows: number;
   validRows: number;
   invalidRows: number;
+  parsedRows: ParsedUploadRow[];
   previewRows: UploadPreviewRow[];
 };
 
@@ -132,15 +138,15 @@ function buildHeaderIndex(worksheet: XLSX.WorkSheet, range: XLSX.Range): HeaderI
     headers.findIndex((value) => candidates.includes(value));
 
   return {
-    createdAt: findHeader("등록일시", "createdat", "date"),
+    createdAt: findHeader("등록일시", "createdat", "date", "created_at"),
     pid: findHeader("pid"),
     process: findHeader("공정", "process"),
-    itemCode: findHeader("품목코드", "itemcode", "code"),
-    itemName: findHeader("품명", "품목명", "itemname"),
+    itemCode: findHeader("품목코드", "itemcode", "code", "item_code"),
+    itemName: findHeader("품명", "품목명", "itemname", "item_name"),
     width: findHeader("가로", "width"),
     height: findHeader("세로", "height"),
     quantity: findHeader("수량", "개수", "quantity"),
-    requestNo: findHeader("의뢰번호", "requestno"),
+    requestNo: findHeader("의뢰번호", "requestno", "request_no"),
     no: findHeader("no"),
     customer: findHeader("거래처", "customer"),
     site: findHeader("현장", "site"),
@@ -157,23 +163,7 @@ function parseCreatedAt(value: string) {
     return null;
   }
 
-  const match = trimmed.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (!match) {
-    const date = new Date(trimmed);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
-  }
-
-  const month = Number(match[1]);
-  const day = Number(match[2]);
-  const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
-  const hour = Number(match[4] ?? 0);
-  const minute = Number(match[5] ?? 0);
-  const second = Number(match[6] ?? 0);
-  const date = new Date(year, month - 1, day, hour, minute, second);
-
+  const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
@@ -187,10 +177,54 @@ function isEmptyRow(worksheet: XLSX.WorkSheet, rowIndex: number, range: XLSX.Ran
   return true;
 }
 
+function buildRawPayload(
+  worksheet: XLSX.WorkSheet,
+  rowIndex: number,
+  range: XLSX.Range,
+  headers: string[]
+) {
+  const payload: Record<string, string> = {};
+
+  for (let columnIndex = range.s.c; columnIndex <= range.e.c; columnIndex += 1) {
+    const headerLabel = headers[columnIndex - range.s.c] || `column_${columnIndex + 1}`;
+    payload[headerLabel] = getCellText(worksheet, rowIndex, columnIndex);
+  }
+
+  return payload;
+}
+
+function buildNormalizedText(parsed: {
+  pid: string | null;
+  no: string | null;
+  draft: ImportedOrderDraft;
+}) {
+  const parts = [
+    parsed.pid,
+    parsed.no,
+    parsed.draft.customer,
+    parsed.draft.site,
+    parsed.draft.process,
+    parsed.draft.item_code,
+    parsed.draft.item_name,
+    parsed.draft.width ? String(parsed.draft.width) : null,
+    parsed.draft.height ? String(parsed.draft.height) : null,
+    parsed.draft.quantity ? String(parsed.draft.quantity) : null,
+    parsed.draft.line,
+    parsed.draft.request_no,
+    parsed.draft.registrant,
+    parsed.draft.memo,
+    parsed.draft.status
+  ];
+
+  return parts.filter((value): value is string => Boolean(value && value.trim())).join(" ");
+}
+
 function parseWorksheetRow(
   worksheet: XLSX.WorkSheet,
   rowIndex: number,
-  headerIndex: HeaderIndex
+  range: XLSX.Range,
+  headerIndex: HeaderIndex,
+  headers: string[]
 ): ParsedUploadRow {
   const draft = emptyDraft();
 
@@ -208,32 +242,24 @@ function parseWorksheetRow(
   draft.memo = getCellText(worksheet, rowIndex, headerIndex.memo);
   draft.status = toStatus(getCellText(worksheet, rowIndex, headerIndex.status));
 
-  if (!draft.customer || !draft.item_name || !draft.quantity) {
-    const reason = !draft.customer
-      ? "거래처 누락"
-      : !draft.item_name
-        ? "품명 누락"
-        : "수량 누락";
-
-    return {
-      rowIndex: rowIndex + 1,
-      draft,
-      createdAt: parseCreatedAt(getCellText(worksheet, rowIndex, headerIndex.createdAt)),
-      pid: getCellText(worksheet, rowIndex, headerIndex.pid) || null,
-      no: getCellText(worksheet, rowIndex, headerIndex.no) || null,
-      valid: false,
-      reason
-    };
-  }
-
-  return {
+  const parsed: ParsedUploadRow = {
     rowIndex: rowIndex + 1,
     draft,
     createdAt: parseCreatedAt(getCellText(worksheet, rowIndex, headerIndex.createdAt)),
     pid: getCellText(worksheet, rowIndex, headerIndex.pid) || null,
     no: getCellText(worksheet, rowIndex, headerIndex.no) || null,
-    valid: true
+    valid: true,
+    rawPayload: buildRawPayload(worksheet, rowIndex, range, headers),
+    normalizedText: ""
   };
+
+  if (!draft.customer || !draft.item_name || !draft.quantity) {
+    parsed.valid = false;
+    parsed.reason = !draft.customer ? "거래처 누락" : !draft.item_name ? "품명 누락" : "수량 누락";
+  }
+
+  parsed.normalizedText = buildNormalizedText(parsed);
+  return parsed;
 }
 
 export function readWorkbook(buffer: ArrayBuffer) {
@@ -244,27 +270,36 @@ export function readWorkbook(buffer: ArrayBuffer) {
   });
 }
 
-export function analyzeWorkbook(
+export function extractWorkbookData(
   buffer: ArrayBuffer,
   fileName: string,
   previewLimit = UPLOAD_PREVIEW_LIMIT
-): UploadPreviewSummary {
+): UploadExtraction {
   const workbook = readWorkbook(buffer);
   const firstSheetName = workbook.SheetNames[0];
 
   if (!firstSheetName) {
     return {
       fileName,
+      sheetName: null,
+      headers: [],
       totalRows: 0,
       validRows: 0,
       invalidRows: 0,
+      parsedRows: [],
       previewRows: []
     };
   }
 
   const worksheet = workbook.Sheets[firstSheetName];
   const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:A1");
+  const headers = [] as string[];
+  for (let columnIndex = range.s.c; columnIndex <= range.e.c; columnIndex += 1) {
+    headers.push(getCellText(worksheet, range.s.r, columnIndex) || `column_${columnIndex + 1}`);
+  }
+
   const headerIndex = buildHeaderIndex(worksheet, range);
+  const parsedRows: ParsedUploadRow[] = [];
   const previewRows: UploadPreviewRow[] = [];
   let totalRows = 0;
   let validRows = 0;
@@ -276,8 +311,9 @@ export function analyzeWorkbook(
     }
 
     totalRows += 1;
+    const parsed = parseWorksheetRow(worksheet, rowIndex, range, headerIndex, headers);
+    parsedRows.push(parsed);
 
-    const parsed = parseWorksheetRow(worksheet, rowIndex, headerIndex);
     if (parsed.valid) {
       validRows += 1;
     } else {
@@ -287,6 +323,8 @@ export function analyzeWorkbook(
     if (previewRows.length < previewLimit) {
       previewRows.push({
         rowIndex: parsed.rowIndex,
+        pid: parsed.pid,
+        no: parsed.no,
         draft: parsed.draft,
         valid: parsed.valid,
         reason: parsed.reason
@@ -296,94 +334,92 @@ export function analyzeWorkbook(
 
   return {
     fileName,
+    sheetName: firstSheetName,
+    headers,
     totalRows,
     validRows,
     invalidRows,
+    parsedRows,
     previewRows
   };
 }
 
-export async function importWorkbookInBatches(
+export function analyzeWorkbook(
   buffer: ArrayBuffer,
+  fileName: string,
+  previewLimit = UPLOAD_PREVIEW_LIMIT
+): UploadPreviewSummary {
+  const extraction = extractWorkbookData(buffer, fileName, previewLimit);
+
+  return {
+    fileName: extraction.fileName,
+    totalRows: extraction.totalRows,
+    validRows: extraction.validRows,
+    invalidRows: extraction.invalidRows,
+    previewRows: extraction.previewRows
+  };
+}
+
+export function buildOrderInsertRows(parsedRows: ParsedUploadRow[]) {
+  return parsedRows
+    .filter((row) => row.valid)
+    .map((row) => ({
+      created_at: row.createdAt,
+      pid: row.pid,
+      process: row.draft.process || null,
+      item_code: row.draft.item_code.trim() || null,
+      item_name: row.draft.item_name.trim(),
+      width: row.draft.width,
+      height: row.draft.height,
+      quantity: row.draft.quantity,
+      area_pyeong: calculateAreaPyeong(row.draft.width, row.draft.height, row.draft.quantity),
+      request_no: row.draft.request_no.trim() || null,
+      no: row.no,
+      customer: row.draft.customer.trim(),
+      site: row.draft.site.trim() || null,
+      line: row.draft.line.trim() || null,
+      registrant: row.draft.registrant.trim() || null,
+      status: row.draft.status,
+      memo: row.draft.memo.trim() || null,
+      is_favorite_source: false
+    }));
+}
+
+export function buildUploadedRowInsertRows(fileId: string, parsedRows: ParsedUploadRow[]) {
+  return parsedRows.map((row) => ({
+    file_id: fileId,
+    row_index: row.rowIndex,
+    pid: row.pid,
+    customer: row.draft.customer.trim() || null,
+    site: row.draft.site.trim() || null,
+    process: row.draft.process || null,
+    item_code: row.draft.item_code.trim() || null,
+    item_name: row.draft.item_name.trim() || null,
+    width: row.draft.width,
+    height: row.draft.height,
+    quantity: row.draft.quantity || null,
+    line: row.draft.line.trim() || null,
+    request_no: row.draft.request_no.trim() || null,
+    registrant: row.draft.registrant.trim() || null,
+    status: row.draft.status,
+    memo: row.draft.memo.trim() || null,
+    area_pyeong:
+      row.draft.width && row.draft.height && row.draft.quantity
+        ? calculateAreaPyeong(row.draft.width, row.draft.height, row.draft.quantity)
+        : null,
+    is_valid: row.valid,
+    validation_notes: row.reason || null,
+    normalized_text: row.normalizedText,
+    raw_payload: row.rawPayload
+  }));
+}
+
+export async function insertRowsInBatches(
+  rows: Array<Record<string, unknown>>,
   insertBatch: (rows: Array<Record<string, unknown>>) => Promise<void>,
   batchSize = UPLOAD_BATCH_SIZE
 ) {
-  const workbook = readWorkbook(buffer);
-  const firstSheetName = workbook.SheetNames[0];
-
-  if (!firstSheetName) {
-    return {
-      totalRows: 0,
-      validRows: 0,
-      invalidRows: 0,
-      insertedRows: 0
-    };
+  for (let index = 0; index < rows.length; index += batchSize) {
+    await insertBatch(rows.slice(index, index + batchSize));
   }
-
-  const worksheet = workbook.Sheets[firstSheetName];
-  const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:A1");
-  const headerIndex = buildHeaderIndex(worksheet, range);
-  const batch: Array<Record<string, unknown>> = [];
-  let totalRows = 0;
-  let validRows = 0;
-  let invalidRows = 0;
-  let insertedRows = 0;
-
-  for (let rowIndex = range.s.r + 1; rowIndex <= range.e.r; rowIndex += 1) {
-    if (isEmptyRow(worksheet, rowIndex, range)) {
-      continue;
-    }
-
-    totalRows += 1;
-
-    const parsed = parseWorksheetRow(worksheet, rowIndex, headerIndex);
-    if (!parsed.valid) {
-      invalidRows += 1;
-      continue;
-    }
-
-    validRows += 1;
-    batch.push({
-      created_at: parsed.createdAt,
-      pid: parsed.pid,
-      process: parsed.draft.process || null,
-      item_code: parsed.draft.item_code.trim() || null,
-      item_name: parsed.draft.item_name.trim(),
-      width: parsed.draft.width,
-      height: parsed.draft.height,
-      quantity: parsed.draft.quantity,
-      area_pyeong: calculateAreaPyeong(
-        parsed.draft.width,
-        parsed.draft.height,
-        parsed.draft.quantity
-      ),
-      request_no: parsed.draft.request_no.trim() || null,
-      no: parsed.no,
-      customer: parsed.draft.customer.trim(),
-      site: parsed.draft.site.trim() || null,
-      line: parsed.draft.line.trim() || null,
-      registrant: parsed.draft.registrant.trim() || null,
-      status: parsed.draft.status,
-      memo: parsed.draft.memo.trim() || null,
-      is_favorite_source: false
-    });
-
-    if (batch.length >= batchSize) {
-      await insertBatch(batch);
-      insertedRows += batch.length;
-      batch.length = 0;
-    }
-  }
-
-  if (batch.length) {
-    await insertBatch(batch);
-    insertedRows += batch.length;
-  }
-
-  return {
-    totalRows,
-    validRows,
-    invalidRows,
-    insertedRows
-  };
 }

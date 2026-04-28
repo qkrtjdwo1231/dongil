@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { BasicOrderForm } from "@/components/BasicOrderForm";
@@ -105,7 +105,7 @@ export function StaffDashboard() {
 
   const handleImportComplete = async (result: UploadImportResult) => {
     await reloadDashboard(
-      `${result.insertedRows.toLocaleString()}건 업로드를 완료했습니다. 유효 ${result.validRows.toLocaleString()}건, 검토 필요 ${result.invalidRows.toLocaleString()}건`
+      `${result.insertedRows.toLocaleString()}건 업로드를 완료했습니다. 유효 ${result.validRows.toLocaleString()}건, 검토 필요 ${result.invalidRows.toLocaleString()}건입니다.`
     );
   };
 
@@ -125,7 +125,7 @@ export function StaffDashboard() {
       return (
         <PlaceholderPanel
           title="팀장 화면"
-          message="팀장 화면은 추후 오늘 일정 확인, 진행 현황 요약을 표시하는 영역으로 확장할 예정입니다."
+          message="팀장 화면은 추후 오늘 할 일, 납기 임박, 진행 현황을 표시할 예정입니다."
         />
       );
     }
@@ -134,7 +134,7 @@ export function StaffDashboard() {
       return (
         <PlaceholderPanel
           title="대표 화면"
-          message="대표 화면은 추후 전체 주문 현황, 거래처별 주문량 등의 요약 지표를 표시하는 영역으로 확장할 예정입니다."
+          message="대표 화면은 추후 전체 주문 현황, 거래처별 주문량, 납기 지연 현황을 표시할 예정입니다."
         />
       );
     }
@@ -245,7 +245,7 @@ export function StaffDashboard() {
               작업 흐름 중심으로 등록하는 작업관리 화면
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기 기반 재등록이 자연스럽게 이어지도록 구성했습니다.
+              반복 입력을 줄이고 직전 주문, 거래처별 최근값, 즐겨찾기, 파일 업로드 기반 조회를 한 흐름 안에서 빠르게 처리할 수 있도록 구성했습니다.
             </p>
           </div>
         </section>

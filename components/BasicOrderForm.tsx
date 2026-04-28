@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { QuantityInput } from "@/components/QuantityInput";
 import { RecentOrderButton } from "@/components/RecentOrderButton";
 import { SectionCard } from "@/components/SectionCard";
+import { UploadRecommendationPanel } from "@/components/UploadRecommendationPanel";
 import { calculateAreaPyeong } from "@/lib/calculations";
 import { PROCESS_OPTIONS, STATUS_OPTIONS } from "@/lib/constants";
 import { createFavorite, createOrder } from "@/lib/data-access";
@@ -26,6 +27,19 @@ type BasicOrderFormProps = {
   onFavoriteCreated: (favorite: FavoriteRecord) => void;
 };
 
+type RecommendationSuggestion = {
+  customer: string | null;
+  site: string | null;
+  process: string | null;
+  item_code: string | null;
+  item_name: string | null;
+  width: number | null;
+  height: number | null;
+  quantity: number | null;
+  line: string | null;
+  memo: string | null;
+};
+
 function toNumberOrNull(value: string) {
   if (!value.trim()) {
     return null;
@@ -33,6 +47,23 @@ function toNumberOrNull(value: string) {
 
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function buildCurrentInputSummary(draft: BasicOrderDraft, quickText: string) {
+  return [
+    quickText.trim() ? `빠른 문장 입력: ${quickText.trim()}` : null,
+    draft.customer.trim() ? `거래처 ${draft.customer.trim()}` : null,
+    draft.site.trim() ? `현장 ${draft.site.trim()}` : null,
+    draft.process ? `공정 ${draft.process}` : null,
+    draft.item_code.trim() ? `품목코드 ${draft.item_code.trim()}` : null,
+    draft.item_name.trim() ? `품명 ${draft.item_name.trim()}` : null,
+    draft.width || draft.height ? `규격 ${draft.width ?? "?"}x${draft.height ?? "?"}` : null,
+    draft.quantity ? `수량 ${draft.quantity}` : null,
+    draft.line.trim() ? `라인 ${draft.line.trim()}` : null,
+    draft.memo.trim() ? `메모 ${draft.memo.trim()}` : null
+  ]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 export function BasicOrderForm({
@@ -53,7 +84,7 @@ export function BasicOrderForm({
   useEffect(() => {
     if (presetDraft) {
       setDraft(presetDraft);
-      setMessage("선택한 즐겨찾기 내용을 기본 등록 폼으로 불러왔습니다.");
+      setMessage("선택한 즐겨찾기 내용을 기본 등록 화면에 불러왔습니다.");
       setError(null);
     }
   }, [presetDraft, presetVersion]);
@@ -81,6 +112,11 @@ export function BasicOrderForm({
     return orders.filter((order) => order.customer === draft.customer.trim()).slice(0, 5);
   }, [draft.customer, orders]);
 
+  const aiCurrentInput = useMemo(
+    () => buildCurrentInputSummary(draft, quickText),
+    [draft, quickText]
+  );
+
   const updateDraft = <K extends keyof BasicOrderDraft>(key: K, value: BasicOrderDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
@@ -99,7 +135,7 @@ export function BasicOrderForm({
       quantity: result.quantity ?? current.quantity,
       line: result.line ?? current.line
     }));
-    setMessage("빠른 문장 입력 내용을 폼에 반영했습니다.");
+    setMessage("빠른 문장 입력 내용을 등록 폼에 반영했습니다.");
     setError(null);
   };
 
@@ -110,13 +146,31 @@ export function BasicOrderForm({
     }
 
     setDraft(cloneLatestOrderToDraft(latestOrder));
-    setMessage("직전 주문을 불러왔습니다. 필요한 항목만 수정해서 다시 등록하면 됩니다.");
+    setMessage("직전 주문을 불러왔습니다. 필요한 값만 수정해서 다시 등록하면 됩니다.");
+    setError(null);
+  };
+
+  const applyAiSuggestion = (suggestion: RecommendationSuggestion) => {
+    setDraft((current) => ({
+      ...current,
+      customer: suggestion.customer ?? current.customer,
+      site: suggestion.site ?? current.site,
+      process: (suggestion.process as BasicOrderDraft["process"]) ?? current.process,
+      item_code: suggestion.item_code ?? current.item_code,
+      item_name: suggestion.item_name ?? current.item_name,
+      width: suggestion.width ?? current.width,
+      height: suggestion.height ?? current.height,
+      quantity: suggestion.quantity ?? current.quantity,
+      line: suggestion.line ?? current.line,
+      memo: suggestion.memo ?? current.memo
+    }));
+    setMessage("업로드 데이터 기반 AI 추천을 기본 등록 폼에 적용했습니다.");
     setError(null);
   };
 
   const saveFavorite = async () => {
     if (!draft.customer.trim() || !draft.item_name.trim()) {
-      setError("즐겨찾기로 저장하려면 최소한 거래처와 품명은 입력해 주세요.");
+      setError("즐겨찾기로 저장하려면 최소한 거래처와 품명을 입력해 주세요.");
       return;
     }
 
@@ -177,7 +231,7 @@ export function BasicOrderForm({
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_1.2fr]">
+        <div className="grid gap-6 xl:grid-cols-[1.02fr_1.18fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -198,9 +252,17 @@ export function BasicOrderForm({
                 className="w-full resize-none rounded-2xl border border-black/10 bg-[#f8fafb] px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
               />
               <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-                문장에서 규격, 수량, 라인 같은 기본 정보를 추출해 폼에 채워줍니다.
+                문장에서 규격, 수량, 라인 같은 기본 정보를 추출해서 폼에 채워줍니다.
               </p>
             </div>
+
+            <UploadRecommendationPanel
+              mode="basic"
+              title="업로드 데이터 기반 AI 추천"
+              currentInput={aiCurrentInput}
+              applyLabel="추천값 폼에 적용"
+              onApply={applyAiSuggestion}
+            />
 
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -283,7 +345,7 @@ export function BasicOrderForm({
           <div className="space-y-4">
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <div className="mb-4 flex items-center justify-between gap-4">
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">Step 1. 거래처/현장</h3>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Step 1. 거래처 / 현장</h3>
                 <button
                   type="button"
                   onClick={saveFavorite}
@@ -346,7 +408,7 @@ export function BasicOrderForm({
             </div>
 
             <div className="rounded-2xl border border-black/5 bg-white p-5">
-              <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Step 2. 제품/규격</h3>
+              <h3 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Step 2. 제품 / 규격</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-[var(--muted)]">
                   <span>공정</span>
@@ -469,10 +531,10 @@ export function BasicOrderForm({
                   <div>
                     <p className="text-xs font-semibold text-[var(--muted)]">자동 계산 평수</p>
                     <p className="mt-1 text-lg font-bold text-[var(--foreground)]">
-                      {areaPyeong ? `${areaPyeong} 평` : "계산 대기"}
+                      {areaPyeong ? `${areaPyeong}평` : "계산 대기"}
                     </p>
                   </div>
-                  <p className="text-xs leading-5 text-[var(--warning)]">사내 공식 계산값과 대조 확인 필요</p>
+                  <p className="text-xs leading-5 text-[var(--warning)]">회사 공식 계산식 확인 필요</p>
                 </div>
               </div>
 

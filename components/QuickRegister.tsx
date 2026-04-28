@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { QuantityInput } from "@/components/QuantityInput";
 import { RecentOrderButton } from "@/components/RecentOrderButton";
 import { SectionCard } from "@/components/SectionCard";
+import { UploadRecommendationPanel } from "@/components/UploadRecommendationPanel";
 import { createOrder } from "@/lib/data-access";
 import type { BasicOrderDraft, CustomerRecord, ItemRecord, OrderRecord } from "@/lib/types";
 
@@ -23,6 +24,42 @@ type CombinationCard = {
   line: string | null;
   count: number;
 };
+
+type RecommendationSuggestion = {
+  customer: string | null;
+  site: string | null;
+  process: string | null;
+  item_code: string | null;
+  item_name: string | null;
+  width: number | null;
+  height: number | null;
+  quantity: number | null;
+  line: string | null;
+  memo: string | null;
+};
+
+function buildCurrentInputSummary(
+  search: string,
+  selectedCustomer: string,
+  selectedSite: string,
+  selectedCard: CombinationCard | null,
+  quantity: number
+) {
+  return [
+    search.trim() ? `거래처 검색 ${search.trim()}` : null,
+    selectedCustomer ? `거래처 ${selectedCustomer}` : null,
+    selectedSite ? `현장 ${selectedSite}` : null,
+    selectedCard?.process ? `공정 ${selectedCard.process}` : null,
+    selectedCard?.item_name ? `품명 ${selectedCard.item_name}` : null,
+    selectedCard?.width || selectedCard?.height
+      ? `규격 ${selectedCard?.width ?? "?"}x${selectedCard?.height ?? "?"}`
+      : null,
+    selectedCard?.line ? `라인 ${selectedCard.line}` : null,
+    quantity ? `수량 ${quantity}` : null
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
 
 export function QuickRegister({ customers, items, orders, onOrderCreated }: QuickRegisterProps) {
   const [search, setSearch] = useState("");
@@ -97,6 +134,11 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
 
   const latestOrder = orders[0];
 
+  const aiCurrentInput = useMemo(
+    () => buildCurrentInputSummary(search, selectedCustomer, selectedSite, selectedCard, quantity),
+    [quantity, search, selectedCard, selectedCustomer, selectedSite]
+  );
+
   const handleLatestOrder = () => {
     if (!latestOrder) {
       return;
@@ -114,6 +156,32 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
     });
     setQuantity(latestOrder.quantity);
     setMessage("직전 주문을 빠른 등록 기본값으로 불러왔습니다.");
+    setError(null);
+  };
+
+  const applyAiSuggestion = (suggestion: RecommendationSuggestion) => {
+    if (suggestion.customer) {
+      setSelectedCustomer(suggestion.customer);
+    }
+    if (suggestion.site) {
+      setSelectedSite(suggestion.site);
+    }
+    if (suggestion.quantity) {
+      setQuantity(suggestion.quantity);
+    }
+
+    if (suggestion.item_name || suggestion.process || suggestion.width || suggestion.height || suggestion.line) {
+      setSelectedCard({
+        process: suggestion.process ?? selectedCard?.process ?? "기타",
+        item_name: suggestion.item_name ?? selectedCard?.item_name ?? "",
+        width: suggestion.width ?? selectedCard?.width ?? null,
+        height: suggestion.height ?? selectedCard?.height ?? null,
+        line: suggestion.line ?? selectedCard?.line ?? null,
+        count: selectedCard?.count ?? 1
+      });
+    }
+
+    setMessage("업로드 데이터 기반 AI 추천을 빠른 등록 후보에 적용했습니다.");
     setError(null);
   };
 
@@ -173,7 +241,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
           </div>
         ) : null}
 
-        <div className="grid gap-5 xl:grid-cols-[0.86fr_1.14fr]">
+        <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <label className="space-y-2 text-sm text-[var(--muted)]">
@@ -207,6 +275,14 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
                 ))}
               </div>
             </div>
+
+            <UploadRecommendationPanel
+              mode="quick"
+              title="업로드 데이터 기반 AI 추천"
+              currentInput={aiCurrentInput}
+              applyLabel="추천 조합 적용"
+              onApply={applyAiSuggestion}
+            />
 
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <p className="text-sm font-semibold text-[var(--foreground)]">최근 현장 추천</p>
@@ -288,7 +364,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
             ) : (
               <EmptyState
                 title="거래처와 현장을 먼저 선택해 주세요"
-                description="선택한 거래처와 현장에서 자주 쓰인 품목 조합 카드를 여기에 보여줍니다."
+                description="선택한 거래처와 현장에서 자주 쓰인 품목 조합 카드를 여기에서 보여줍니다."
               />
             )}
 
@@ -298,7 +374,7 @@ export function QuickRegister({ customers, items, orders, onOrderCreated }: Quic
                   title="추천 가능한 조합이 없습니다"
                   description={
                     items.length
-                      ? "해당 현장의 주문 이력이 아직 적습니다. 다른 현장을 선택하거나 기본 등록 화면을 이용해 주세요."
+                      ? "해당 현장 주문 이력이 아직 적습니다. 다른 현장을 선택하거나 기본 등록 화면을 이용해 주세요."
                       : "아직 품목 또는 주문 데이터가 충분하지 않습니다."
                   }
                 />

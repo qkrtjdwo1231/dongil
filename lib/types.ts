@@ -1,4 +1,4 @@
-export type Role = "직원" | "팀장" | "대표";
+﻿export type Role = "직원" | "팀장" | "대표";
 
 export type StaffMenu =
   | "import"
@@ -125,6 +125,8 @@ export type ImportedOrderDraft = {
 
 export type UploadPreviewRow = {
   rowIndex: number;
+  pid: string | null;
+  no: string | null;
   draft: ImportedOrderDraft;
   valid: boolean;
   reason?: string;
@@ -143,6 +145,34 @@ export type UploadImportResult = {
   validRows: number;
   invalidRows: number;
   insertedRows: number;
+  uploadedFileId?: string;
+  insertedUploadRows?: number;
   storedFileBucket?: string;
   storedFilePath?: string;
+};
+
+export type StoredUploadFile = {
+  name: string;
+  path: string;
+  size: number | null;
+  updatedAt: string | null;
+  signedUrl: string | null;
+};
+
+export type UploadChatUsedFile = {
+  id?: string;
+  name: string;
+  path: string;
+  summary: string;
+  rowCount?: number;
+};
+
+export type AiMemoryRule = {
+  id: string;
+  created_at: string;
+  title: string;
+  category: string;
+  content: string;
+  priority: number;
+  is_active: boolean;
 };

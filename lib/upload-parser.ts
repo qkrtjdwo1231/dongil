@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+﻿import * as XLSX from "xlsx";
 import type { ImportedOrderDraft, OrderStatus, ProcessType, UploadPreviewRow } from "@/lib/types";
 
 const PROCESS_VALUES: ProcessType[] = ["복층", "강화", "접합", "창호", "기타"];
@@ -66,16 +66,18 @@ function parseWorkbookRows(rows: unknown[][]): UploadPreviewRow[] {
   const headers = rows[0].map((value) => normalizeHeader(value));
 
   const headerIndex = {
+    pid: headers.findIndex((value) => ["pid"].includes(value)),
+    no: headers.findIndex((value) => ["no"].includes(value)),
     customer: headers.findIndex((value) => ["customer", "거래처"].includes(value)),
     site: headers.findIndex((value) => ["site", "현장"].includes(value)),
     process: headers.findIndex((value) => ["process", "공정"].includes(value)),
-    item_code: headers.findIndex((value) => ["itemcode", "품목코드", "code"].includes(value)),
-    item_name: headers.findIndex((value) => ["itemname", "품명", "품목명"].includes(value)),
+    item_code: headers.findIndex((value) => ["itemcode", "품목코드", "code", "item_code"].includes(value)),
+    item_name: headers.findIndex((value) => ["itemname", "품명", "품목명", "item_name"].includes(value)),
     width: headers.findIndex((value) => ["width", "가로"].includes(value)),
     height: headers.findIndex((value) => ["height", "세로"].includes(value)),
-    quantity: headers.findIndex((value) => ["quantity", "수량", "장수", "개수"].includes(value)),
+    quantity: headers.findIndex((value) => ["quantity", "수량", "개수"].includes(value)),
     line: headers.findIndex((value) => ["line", "라인"].includes(value)),
-    request_no: headers.findIndex((value) => ["requestno", "의뢰번호"].includes(value)),
+    request_no: headers.findIndex((value) => ["requestno", "의뢰번호", "request_no"].includes(value)),
     registrant: headers.findIndex((value) => ["registrant", "등록자"].includes(value)),
     memo: headers.findIndex((value) => ["memo", "메모", "비고"].includes(value)),
     status: headers.findIndex((value) => ["status", "상태"].includes(value))
@@ -100,15 +102,16 @@ function parseWorkbookRows(rows: unknown[][]): UploadPreviewRow[] {
       draft.memo = String(row[headerIndex.memo] ?? "").trim();
       draft.status = toStatus(row[headerIndex.status]);
 
+      const pid = headerIndex.pid >= 0 ? String(row[headerIndex.pid] ?? "").trim() || null : null;
+      const no = headerIndex.no >= 0 ? String(row[headerIndex.no] ?? "").trim() || null : null;
+
       if (!draft.customer || !draft.item_name || !draft.quantity) {
-        const reason = !draft.customer
-          ? "거래처 누락"
-          : !draft.item_name
-            ? "품명 누락"
-            : "수량 누락";
+        const reason = !draft.customer ? "거래처 누락" : !draft.item_name ? "품명 누락" : "수량 누락";
 
         return {
           rowIndex: index + 2,
+          pid,
+          no,
           draft,
           valid: false,
           reason
@@ -117,6 +120,8 @@ function parseWorkbookRows(rows: unknown[][]): UploadPreviewRow[] {
 
       return {
         rowIndex: index + 2,
+        pid,
+        no,
         draft,
         valid: true
       };
