@@ -55,6 +55,12 @@ type RecommendationSuggestion = {
   memo: string | null;
 };
 
+type LiveSuggestionItem = {
+  label: string;
+  reason: string;
+  suggestion: RecommendationSuggestion;
+};
+
 const MAX_ROWS_PER_FILE = 18;
 const FALLBACK_ROWS_PER_FILE = 10;
 
@@ -247,6 +253,34 @@ export function buildRecommendationPrompt(
   ].join("\n");
 }
 
+export function buildLiveSuggestionPrompt(
+  input: string,
+  contexts: SearchContext[],
+  rules: MemoryRuleRecord[]
+) {
+  return [
+    "너는 청주 유리/창호 제조업체의 빠른 문장 입력 추천 도우미다.",
+    "사용자가 타이핑 중인 문장을 저장된 업로드 데이터와 회사 기억 규칙만 바탕으로 해석해라.",
+    "업로드 데이터에서 근거가 약한 값은 추천하지 말고 null로 둬라.",
+    "응답은 반드시 JSON 하나만 반환하고 설명 문장은 JSON 밖에 쓰지 마라.",
+    "추천 후보는 1개 이상 4개 이하로 만든다.",
+    "JSON 형식:",
+    '{"suggestions":[{"label":"짧은 후보명","reason":"왜 이 후보가 맞는지 짧게 설명","suggestion":{"customer":null,"site":null,"process":null,"item_code":null,"item_name":null,"width":null,"height":null,"quantity":null,"line":null,"memo":null}}]}',
+    buildRuleSection(rules),
+    "",
+    `사용자 입력: ${input}`,
+    "",
+    "참고 업로드 데이터:",
+    ...contexts.flatMap((context, index) => [
+      `파일 ${index + 1}: ${context.file.original_name}`,
+      `요약: ${context.file.summary_text ?? "요약 없음"}`,
+      `행 수: ${context.rows.length}`,
+      ...context.rows.map((row) => rowToLine(row)),
+      ""
+    ])
+  ].join("\n");
+}
+
 export function buildUsedFileSummaries(contexts: SearchContext[]): UploadChatUsedFile[] {
   return contexts.map((context) => ({
     id: context.file.id,
@@ -260,6 +294,7 @@ export function buildUsedFileSummaries(contexts: SearchContext[]): UploadChatUse
 }
 
 export type {
+  LiveSuggestionItem,
   MemoryRuleRecord,
   RecommendationMode,
   RecommendationSuggestion,

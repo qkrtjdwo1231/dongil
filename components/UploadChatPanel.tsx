@@ -162,9 +162,9 @@ export function UploadChatPanel({ storedFiles }: UploadChatPanelProps) {
         <div className="rounded-2xl border border-black/5 bg-[var(--secondary)]/70 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">참고 파일 선택</p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">업로드 데이터 자동 참고</p>
               <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                현재 {selectedPaths.length}개 파일을 참고합니다.
+                최신 업로드 파일 {selectedPaths.length}개를 자동으로 참고합니다.
                 {selectedNames.length ? ` (${selectedNames.join(", ")})` : ""}
               </p>
             </div>
@@ -173,41 +173,11 @@ export function UploadChatPanel({ storedFiles }: UploadChatPanelProps) {
             </div>
           </div>
 
-          <div className="mt-4 max-h-44 space-y-2 overflow-y-auto pr-1">
-            {storedFiles.length ? (
-              storedFiles.map((file) => {
-                const checked = selectedPaths.includes(file.path);
-
-                return (
-                  <label
-                    key={file.path}
-                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-2 text-sm transition ${
-                      checked
-                        ? "border-[var(--primary)] bg-white text-[var(--foreground)]"
-                        : "border-black/5 bg-white/70 text-[var(--muted)] hover:border-black/10"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleFile(file.path)}
-                      className="mt-1 h-4 w-4 rounded border-black/20 text-[var(--primary)] focus:ring-[var(--primary)]"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{file.name}</span>
-                      <span className="block text-xs text-[var(--muted)]">
-                        {file.updatedAt ? new Date(file.updatedAt).toLocaleString() : "업로드 시각 없음"}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })
-            ) : (
-              <p className="text-sm text-[var(--muted)]">
-                저장된 업로드 파일이 아직 없습니다. 먼저 파일 업로드를 완료해 주세요.
-              </p>
-            )}
-          </div>
+          {!storedFiles.length ? (
+            <p className="mt-4 text-sm text-[var(--muted)]">
+              저장된 업로드 파일이 아직 없습니다. 먼저 파일 업로드를 완료해 주세요.
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded-3xl border border-black/5 bg-white">

@@ -1,21 +1,20 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { QuantityInput } from "@/components/QuantityInput";
 import { RecentOrderButton } from "@/components/RecentOrderButton";
 import { SectionCard } from "@/components/SectionCard";
-import { UploadRecommendationPanel } from "@/components/UploadRecommendationPanel";
 import { calculateAreaPyeong } from "@/lib/calculations";
 import { PROCESS_OPTIONS, STATUS_OPTIONS } from "@/lib/constants";
 import { createFavorite, createOrder } from "@/lib/data-access";
 import { createEmptyOrderDraft, cloneLatestOrderToDraft } from "@/lib/order-helpers";
-import { parseQuickOrderText } from "@/lib/parsers";
 import { buildCustomerRecommendations } from "@/lib/recommendation";
 import type {
   BasicOrderDraft,
   CustomerRecord,
   FavoriteRecord,
-  OrderRecord
+  OrderRecord,
+  UploadChatUsedFile
 } from "@/lib/types";
 
 type BasicOrderFormProps = {
@@ -40,6 +39,18 @@ type RecommendationSuggestion = {
   memo: string | null;
 };
 
+type LiveSuggestionItem = {
+  label: string;
+  reason: string;
+  suggestion: RecommendationSuggestion;
+};
+
+type LiveSuggestResponse = {
+  suggestions: LiveSuggestionItem[];
+  usedFiles: UploadChatUsedFile[];
+  error?: string;
+};
+
 function toNumberOrNull(value: string) {
   if (!value.trim()) {
     return null;
@@ -49,21 +60,38 @@ function toNumberOrNull(value: string) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-function buildCurrentInputSummary(draft: BasicOrderDraft, quickText: string) {
+function buildSuggestionSummary(suggestion: RecommendationSuggestion) {
   return [
-    quickText.trim() ? `빠른 문장 입력: ${quickText.trim()}` : null,
-    draft.customer.trim() ? `거래처 ${draft.customer.trim()}` : null,
-    draft.site.trim() ? `현장 ${draft.site.trim()}` : null,
-    draft.process ? `공정 ${draft.process}` : null,
-    draft.item_code.trim() ? `품목코드 ${draft.item_code.trim()}` : null,
-    draft.item_name.trim() ? `품명 ${draft.item_name.trim()}` : null,
-    draft.width || draft.height ? `규격 ${draft.width ?? "?"}x${draft.height ?? "?"}` : null,
-    draft.quantity ? `수량 ${draft.quantity}` : null,
-    draft.line.trim() ? `라인 ${draft.line.trim()}` : null,
-    draft.memo.trim() ? `메모 ${draft.memo.trim()}` : null
+    suggestion.customer ? `거래처 ${suggestion.customer}` : null,
+    suggestion.site ? `현장 ${suggestion.site}` : null,
+    suggestion.process ? `공정 ${suggestion.process}` : null,
+    suggestion.item_name ? `품명 ${suggestion.item_name}` : null,
+    suggestion.width || suggestion.height
+      ? `규격 ${suggestion.width ?? "?"}x${suggestion.height ?? "?"}`
+      : null,
+    suggestion.quantity ? `수량 ${suggestion.quantity}` : null,
+    suggestion.line ? `라인 ${suggestion.line}` : null
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+async function requestLiveSuggestions(input: string, signal: AbortSignal) {
+  const response = await fetch("/api/ai/live-order-suggest", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ input }),
+    signal
+  });
+
+  const payload = (await response.json()) as LiveSuggestResponse;
+  if (!response.ok) {
+    throw new Error(payload.error ?? "실시간 추천을 불러오지 못했습니다.");
+  }
+
+  return payload;
 }
 
 export function BasicOrderForm({
@@ -80,6 +108,10 @@ export function BasicOrderForm({
   const [favoriteSaving, setFavoriteSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveSuggestions, setLiveSuggestions] = useState<LiveSuggestionItem[]>([]);
+  const [liveUsedFiles, setLiveUsedFiles] = useState<UploadChatUsedFile[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const liveAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (presetDraft) {
@@ -88,6 +120,45 @@ export function BasicOrderForm({
       setError(null);
     }
   }, [presetDraft, presetVersion]);
+
+  useEffect(() => {
+    const input = quickText.trim();
+    liveAbortRef.current?.abort();
+
+    if (input.length < 2) {
+      setLiveSuggestions([]);
+      setLiveUsedFiles([]);
+      setLiveLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    liveAbortRef.current = controller;
+    const timeout = window.setTimeout(async () => {
+      try {
+        setLiveLoading(true);
+        const payload = await requestLiveSuggestions(input, controller.signal);
+        setLiveSuggestions(payload.suggestions ?? []);
+        setLiveUsedFiles(payload.usedFiles ?? []);
+      } catch (liveError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setLiveSuggestions([]);
+        setLiveUsedFiles([]);
+        setError(liveError instanceof Error ? liveError.message : "실시간 추천을 불러오지 못했습니다.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLiveLoading(false);
+        }
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [quickText]);
 
   const areaPyeong = useMemo(
     () => calculateAreaPyeong(draft.width, draft.height, draft.quantity),
@@ -112,31 +183,8 @@ export function BasicOrderForm({
     return orders.filter((order) => order.customer === draft.customer.trim()).slice(0, 5);
   }, [draft.customer, orders]);
 
-  const aiCurrentInput = useMemo(
-    () => buildCurrentInputSummary(draft, quickText),
-    [draft, quickText]
-  );
-
   const updateDraft = <K extends keyof BasicOrderDraft>(key: K, value: BasicOrderDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
-  };
-
-  const applyQuickParse = () => {
-    const result = parseQuickOrderText(quickText);
-    const matchedCustomer = customers.find((customer) => result.originalText.includes(customer.name));
-
-    setDraft((current) => ({
-      ...current,
-      customer: matchedCustomer?.name ?? current.customer,
-      item_name: result.itemNameCandidate || current.item_name,
-      memo: result.memoCandidate || current.memo,
-      width: result.width ?? current.width,
-      height: result.height ?? current.height,
-      quantity: result.quantity ?? current.quantity,
-      line: result.line ?? current.line
-    }));
-    setMessage("빠른 문장 입력 내용을 등록 폼에 반영했습니다.");
-    setError(null);
   };
 
   const applyLatestOrder = () => {
@@ -150,10 +198,15 @@ export function BasicOrderForm({
     setError(null);
   };
 
-  const applyAiSuggestion = (suggestion: RecommendationSuggestion) => {
+  const applyLiveSuggestion = (suggestion: RecommendationSuggestion) => {
+    const matchedCustomer =
+      suggestion.customer && customers.some((customer) => customer.name === suggestion.customer)
+        ? suggestion.customer
+        : draft.customer;
+
     setDraft((current) => ({
       ...current,
-      customer: suggestion.customer ?? current.customer,
+      customer: matchedCustomer,
       site: suggestion.site ?? current.site,
       process: (suggestion.process as BasicOrderDraft["process"]) ?? current.process,
       item_code: suggestion.item_code ?? current.item_code,
@@ -164,7 +217,7 @@ export function BasicOrderForm({
       line: suggestion.line ?? current.line,
       memo: suggestion.memo ?? current.memo
     }));
-    setMessage("업로드 데이터 기반 AI 추천을 기본 등록 폼에 적용했습니다.");
+    setMessage("실시간 추천 후보를 선택해 등록 폼에 반영했습니다.");
     setError(null);
   };
 
@@ -204,6 +257,8 @@ export function BasicOrderForm({
       onOrderCreated(createdOrder);
       setDraft(createEmptyOrderDraft());
       setQuickText("");
+      setLiveSuggestions([]);
+      setLiveUsedFiles([]);
       setMessage("주문을 등록했습니다.");
     } catch {
       setError("주문 저장에 실패했습니다. Supabase 연결 상태를 확인해 주세요.");
@@ -235,34 +290,74 @@ export function BasicOrderForm({
           <div className="space-y-4">
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">빠른 문장 입력</h3>
-                <button
-                  type="button"
-                  onClick={applyQuickParse}
-                  className="rounded-xl bg-[var(--foreground)] px-3 py-2 text-xs font-semibold text-white"
-                >
-                  자동 분리
-                </button>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">빠른 문장 입력 + AI 실시간 추천</h3>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-800">
+                  타이핑 중 자동 추천
+                </span>
               </div>
               <textarea
                 rows={6}
                 value={quickText}
-                onChange={(event) => setQuickText(event.target.value)}
+                onChange={(event) => {
+                  setQuickText(event.target.value);
+                  setError(null);
+                }}
                 placeholder="예: OO건설 청주A현장 복층유리 1200x1800 30장 2라인"
                 className="w-full resize-none rounded-2xl border border-black/10 bg-[#f8fafb] px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
               />
               <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-                문장에서 규격, 수량, 라인 같은 기본 정보를 추출해서 폼에 채워줍니다.
+                문장을 끝까지 완성한 뒤 엔터를 칠 필요 없이, 입력 중인 내용과 업로드 데이터를 기준으로 관련도 높은 후보를 실시간으로 추천합니다.
               </p>
-            </div>
 
-            <UploadRecommendationPanel
-              mode="basic"
-              title="업로드 데이터 기반 AI 추천"
-              currentInput={aiCurrentInput}
-              applyLabel="추천값 폼에 적용"
-              onApply={applyAiSuggestion}
-            />
+              <div className="mt-4 rounded-2xl border border-black/5 bg-[var(--secondary)]/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-[var(--muted)]">실시간 추천 후보</p>
+                  <span className="text-xs text-[var(--muted)]">
+                    {liveLoading ? "추천 찾는 중..." : `${liveSuggestions.length}개 후보`}
+                  </span>
+                </div>
+
+                {quickText.trim().length < 2 ? (
+                  <p className="mt-3 text-sm text-[var(--muted)]">두 글자 이상 입력하면 업로드 데이터 기반 후보가 여기에 표시됩니다.</p>
+                ) : liveSuggestions.length ? (
+                  <div className="mt-3 space-y-3">
+                    {liveSuggestions.map((item, index) => (
+                      <button
+                        key={`${item.label}-${index}`}
+                        type="button"
+                        onClick={() => applyLiveSuggestion(item.suggestion)}
+                        className="w-full rounded-2xl border border-black/5 bg-white px-4 py-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--secondary)]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-[var(--foreground)]">{item.label}</p>
+                          <span className="text-xs font-medium text-[var(--primary)]">클릭해서 적용</span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{item.reason}</p>
+                        <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
+                          {buildSuggestionSummary(item.suggestion)}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-[var(--muted)]">현재 입력과 바로 연결되는 추천 후보를 찾지 못했습니다.</p>
+                )}
+
+                {liveUsedFiles.length ? (
+                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
+                    <p className="font-semibold">이번 추천에 참고한 업로드 파일</p>
+                    <div className="mt-2 space-y-1">
+                      {liveUsedFiles.map((file) => (
+                        <p key={file.path}>
+                          {file.name}: {file.summary}
+                          {file.rowCount ? ` / 참고 행 ${file.rowCount}건` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
 
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -544,6 +639,8 @@ export function BasicOrderForm({
                   onClick={() => {
                     setDraft(createEmptyOrderDraft());
                     setQuickText("");
+                    setLiveSuggestions([]);
+                    setLiveUsedFiles([]);
                     setError(null);
                     setMessage(null);
                   }}

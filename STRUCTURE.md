@@ -300,3 +300,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 - components/UploadRecommendationPanel.tsx: 기본 등록/빠른 등록에서 업로드 데이터 기반 AI 추천을 요청하고 결과를 적용하는 공용 패널
 - app/api/ai/order-recommend/route.ts: 업로드 행 데이터와 AI 기억 규칙을 바탕으로 구조화된 추천을 반환하는 API
 
+
+- app/api/ai/live-order-suggest/route.ts: 빠른 문장 입력 중 업로드 데이터 기반 실시간 후보를 반환하는 API
+

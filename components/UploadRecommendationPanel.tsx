@@ -105,12 +105,6 @@ export function UploadRecommendationPanel({
     [selectedPaths, storedFiles]
   );
 
-  const toggleFile = (path: string) => {
-    setSelectedPaths((current) =>
-      current.includes(path) ? current.filter((item) => item !== path) : [...current, path]
-    );
-  };
-
   const requestRecommendation = async () => {
     if (!selectedPaths.length) {
       setError("추천에 참고할 업로드 파일을 1개 이상 선택해 주세요.");
@@ -157,42 +151,22 @@ export function UploadRecommendationPanel({
         <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">{currentInput || "아직 입력된 값이 없습니다."}</p>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 rounded-2xl border border-black/5 bg-[var(--secondary)]/60 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-semibold text-[var(--muted)]">참고 업로드 파일</p>
+          <p className="text-xs font-semibold text-[var(--muted)]">업로드 데이터 자동 참고</p>
           <span className="text-xs text-[var(--muted)]">
-            {selectedNames.length ? `${selectedNames.length}개 선택됨` : "선택 없음"}
+            {selectedNames.length ? `${selectedNames.length}개 파일 자동 연결됨` : "연결된 파일 없음"}
           </span>
         </div>
 
         {loading ? (
-          <p className="text-sm text-[var(--muted)]">파일 목록을 불러오는 중입니다.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">파일 목록을 불러오는 중입니다.</p>
         ) : !storedFiles.length ? (
-          <p className="text-sm text-[var(--muted)]">추천에 사용할 업로드 파일이 아직 없습니다.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">추천에 사용할 업로드 파일이 아직 없습니다.</p>
         ) : (
-          <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
-            {storedFiles.map((file) => {
-              const checked = selectedPaths.includes(file.path);
-              return (
-                <label
-                  key={file.path}
-                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-2 text-sm transition ${
-                    checked
-                      ? "border-[var(--primary)] bg-white text-[var(--foreground)]"
-                      : "border-black/5 bg-white/70 text-[var(--muted)] hover:border-black/10"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleFile(file.path)}
-                    className="mt-1 h-4 w-4 rounded border-black/20 text-[var(--primary)] focus:ring-[var(--primary)]"
-                  />
-                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                </label>
-              );
-            })}
-          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
+            {selectedNames.join(", ")}
+          </p>
         )}
       </div>
 
