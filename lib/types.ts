@@ -12,6 +12,7 @@ export type ExecutiveMenu =
   | "settings";
 
 export type ProcessType = string;
+export type ProductFamily = "접합/안전" | "로이/코팅" | "단열/아르곤" | "일반/복층";
 
 export type OrderStatus = "등록" | "확인필요" | "진행" | "완료" | "보류";
 
@@ -20,6 +21,7 @@ export type OrderRecord = {
   created_at: string;
   pid: string | null;
   process: ProcessType | null;
+  product_family?: ProductFamily | null;
   item_code: string | null;
   item_name: string;
   width: number | null;
@@ -134,16 +136,27 @@ export type UploadAnalysisSnapshot = {
   uniqueCustomers: number;
   uniqueSites: number;
   uniqueItems: number;
+  uniqueProductFamilies: number;
   uniqueLines: number;
   uniqueRegistrants: number;
   uniquePids: number;
   rowsWithPid: number;
   rowsMissingPid: number;
+  rowsDuplicatePid: number;
   rowsMissingDimensions: number;
   rowsMissingCustomer: number;
+  rowsMissingSite: number;
   rowsMissingItemName: number;
   rowsMissingQuantity: number;
+  rowsMissingLine: number;
   rowsMarkedHold: number;
+  rowsInvalidWidth: number;
+  rowsInvalidHeight: number;
+  rowsInvalidArea: number;
+  rowsAfterHours: number;
+  peakMonthLabel: string | null;
+  peakHourLabel: string | null;
+  topProductFamilies: UploadAnalysisGroup[];
   topCustomers: UploadAnalysisGroup[];
   topItems: UploadAnalysisGroup[];
   topLines: UploadAnalysisGroup[];
@@ -182,6 +195,15 @@ export type StoredUploadFile = {
   size: number | null;
   updatedAt: string | null;
   signedUrl: string | null;
+};
+
+export type UploadedAnalysisFile = {
+  id: string;
+  created_at: string;
+  original_name: string;
+  stored_path: string;
+  summary_text: string | null;
+  analysis_snapshot: UploadAnalysisSnapshot | null;
 };
 
 export type UploadChatUsedFile = {

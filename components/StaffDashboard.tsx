@@ -6,11 +6,18 @@ import { Header } from "@/components/Header";
 import { TeamLeadDashboard } from "@/components/TeamLeadDashboard";
 import { loadDashboardData, updateOrderStatus } from "@/lib/data-access";
 import { supabaseConfig } from "@/lib/supabaseClient";
-import type { OrderRecord, OrderStatus, Role, UploadImportResult } from "@/lib/types";
+import type {
+  OrderRecord,
+  OrderStatus,
+  Role,
+  UploadedAnalysisFile,
+  UploadImportResult
+} from "@/lib/types";
 
 export function StaffDashboard() {
   const [role, setRole] = useState<Role>("팀장");
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedAnalysisFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -19,6 +26,7 @@ export function StaffDashboard() {
     try {
       const data = await loadDashboardData();
       setOrders(data.orders);
+      setUploadedFiles(data.uploadedFiles);
       setNotice(nextNotice ?? null);
     } catch {
       setNotice("초기 데이터를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.");
@@ -72,7 +80,11 @@ export function StaffDashboard() {
         ) : role === "팀장" ? (
           <TeamLeadDashboard orders={orders} onImportComplete={handleImportComplete} onStatusChange={handleOrderStatusChange} />
         ) : (
-          <ExecutiveDashboard orders={orders} onImportComplete={handleImportComplete} />
+          <ExecutiveDashboard
+            orders={orders}
+            uploadedFiles={uploadedFiles}
+            onImportComplete={handleImportComplete}
+          />
         )}
       </main>
     </div>

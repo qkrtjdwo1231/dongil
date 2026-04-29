@@ -1,8 +1,16 @@
-﻿import type { OrderRecord } from "@/lib/types";
+import { classifyProductFamily } from "@/lib/product-family";
+import type { OrderRecord } from "@/lib/types";
 
 export type AnalyticsRangeKey = "7d" | "30d" | "90d" | "180d" | "365d" | "all";
 export type AnalyticsMetric = "quantity" | "area";
-export type AnalyticsDimension = "customer" | "site" | "item" | "line" | "process" | "registrant";
+export type AnalyticsDimension =
+  | "customer"
+  | "site"
+  | "item"
+  | "productFamily"
+  | "line"
+  | "process"
+  | "registrant";
 export type AnalyticsGranularity = "day" | "week" | "month";
 
 function parseDate(value: string) {
@@ -61,11 +69,13 @@ export function groupOrdersByDimension(orders: OrderRecord[], dimension: Analyti
           ? order.site || "미지정 현장"
           : dimension === "item"
             ? order.item_name || "미지정 품명"
-            : dimension === "line"
-              ? order.line || "미지정 라인"
-              : dimension === "process"
-                ? order.process || "미지정 공정"
-                : order.registrant || "미지정 등록자";
+            : dimension === "productFamily"
+              ? order.product_family || classifyProductFamily(order.item_name || "")
+              : dimension === "line"
+                ? order.line || "미지정 라인"
+                : dimension === "process"
+                  ? order.process || "미지정 공정"
+                  : order.registrant || "미지정 등록자";
 
     const bucket = map.get(key) ?? [];
     bucket.push(order);
@@ -117,10 +127,12 @@ export function getUniqueCount(values: Array<string | null | undefined>) {
 }
 
 export function getLatestOrderDate(orders: OrderRecord[]) {
-  return orders
-    .map((order) => parseDate(order.created_at))
-    .filter((date): date is Date => Boolean(date))
-    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  return (
+    orders
+      .map((order) => parseDate(order.created_at))
+      .filter((date): date is Date => Boolean(date))
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+  );
 }
 
 export function getTodayOrders(orders: OrderRecord[]) {
@@ -173,4 +185,43 @@ export function calculateChange(current: number, previous: number) {
   }
 
   return ((current - previous) / previous) * 100;
+}
+
+export function calculateTopSharePercent(
+  orders: OrderRecord[],
+  dimension: AnalyticsDimension,
+  topCount: number,
+  metric: AnalyticsMetric
+) {
+  const total = sumMetric(orders, metric);
+  if (!total) {
+    return 0;
+  }
+
+  const grouped = groupOrdersByDimension(orders, dimension)
+    .sort((left, right) => (metric === "quantity" ? right.quantity - left.quantity : right.area - left.area))
+    .slice(0, topCount);
+
+  const topTotal = grouped.reduce(
+    (sum, group) => sum + (metric === "quantity" ? group.quantity : group.area),
+    0
+  );
+
+  return (topTotal / total) * 100;
+}
+
+export function calculateMissingRate(
+  orders: OrderRecord[],
+  field: "site" | "customer" | "item_name" | "line" | "pid"
+) {
+  if (!orders.length) {
+    return 0;
+  }
+
+  const missingCount = orders.filter((order) => {
+    const value = order[field];
+    return value === null || value === undefined || String(value).trim() === "";
+  }).length;
+
+  return (missingCount / orders.length) * 100;
 }

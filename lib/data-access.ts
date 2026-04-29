@@ -1,15 +1,17 @@
 ﻿import { mockOrders } from "@/lib/mockData";
 import { supabase } from "@/lib/supabaseClient";
-import type { OrderRecord, OrderStatus } from "@/lib/types";
+import type { OrderRecord, OrderStatus, UploadedAnalysisFile } from "@/lib/types";
 
 type DashboardData = {
   orders: OrderRecord[];
+  uploadedFiles: UploadedAnalysisFile[];
 };
 
 export async function loadDashboardData(): Promise<DashboardData> {
   if (!supabase) {
     return {
-      orders: mockOrders
+      orders: mockOrders,
+      uploadedFiles: []
     };
   }
 
@@ -19,8 +21,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
     .order("created_at", { ascending: false })
     .limit(5000);
 
+  const uploadedFilesResponse = await supabase
+    .from("uploaded_files")
+    .select("id, created_at, original_name, stored_path, summary_text, analysis_snapshot")
+    .order("created_at", { ascending: false })
+    .limit(30);
+
   return {
-    orders: ordersResponse.data ?? []
+    orders: ordersResponse.data ?? [],
+    uploadedFiles: uploadedFilesResponse.data ?? []
   };
 }
 

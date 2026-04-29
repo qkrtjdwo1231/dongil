@@ -589,6 +589,12 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3">
+                    <span>주요 제품군</span>
+                    <strong className="text-right text-[var(--foreground)]">
+                      {summary ? renderTopGroup(summary.analysis.topProductFamilies) : "-"}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <span>주요 라인</span>
                     <strong className="text-right text-[var(--foreground)]">
                       {summary ? renderTopGroup(summary.analysis.topLines) : "-"}
@@ -607,9 +613,21 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3">
+                    <span>PID 중복</span>
+                    <strong className="text-amber-700">
+                      {summary ? summary.analysis.rowsDuplicatePid.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <span>거래처 누락</span>
                     <strong className="text-amber-700">
                       {summary ? summary.analysis.rowsMissingCustomer.toLocaleString() : 0}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>현장 미입력</span>
+                    <strong className="text-amber-700">
+                      {summary ? summary.analysis.rowsMissingSite.toLocaleString() : 0}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between gap-3">
@@ -637,6 +655,16 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     <span className="text-sm text-[var(--muted)]">파일을 선택하면 검토 포인트가 표시됩니다.</span>
                   )}
                 </div>
+                {summary ? (
+                  <div className="mt-4 grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-2">
+                    <div className="rounded-2xl bg-[var(--secondary)] px-3 py-2">
+                      피크 월: <strong className="text-[var(--foreground)]">{summary.analysis.peakMonthLabel ?? "-"}</strong>
+                    </div>
+                    <div className="rounded-2xl bg-[var(--secondary)] px-3 py-2">
+                      피크 시간대: <strong className="text-[var(--foreground)]">{summary.analysis.peakHourLabel ?? "-"}</strong>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 

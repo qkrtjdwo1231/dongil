@@ -5,6 +5,10 @@ import type { StoredUploadFile } from "@/lib/types";
 
 type UploadChatPanelProps = {
   storedFiles: StoredUploadFile[];
+  starterPrompts?: string[];
+  title?: string;
+  description?: string;
+  badgeLabel?: string;
 };
 
 type ChatMessage = {
@@ -24,14 +28,20 @@ type UploadChatResponse = {
   }>;
 };
 
-const starterPrompts = [
+const defaultStarterPrompts = [
   "최근 업로드 파일에서 거래처별 주문 흐름을 요약해줘.",
   "규격이나 수량이 비어 있는 행이 있는지 찾아줘.",
   "자주 나온 품명과 라인을 정리해줘.",
   "PID가 있는 행 기준으로 핵심 값만 정리해줘."
 ];
 
-export function UploadChatPanel({ storedFiles }: UploadChatPanelProps) {
+export function UploadChatPanel({
+  storedFiles,
+  starterPrompts = defaultStarterPrompts,
+  title = "AI 업로드 도우미",
+  description = "업로드한 파일과 저장된 업로드 데이터만 기준으로 답변합니다. 추측하지 않고, 필요한 경우 PID·거래처·품명·규격 기준으로 정리해드립니다.",
+  badgeLabel = "선택 파일 기준 답변"
+}: UploadChatPanelProps) {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -148,14 +158,14 @@ export function UploadChatPanel({ storedFiles }: UploadChatPanelProps) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">
-              AI 업로드 도우미
+              {title}
             </p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-              업로드한 파일과 저장된 업로드 데이터만 기준으로 답변합니다. 추측하지 않고, 필요한 경우 PID·거래처·품명·규격 기준으로 정리해드립니다.
+              {description}
             </p>
           </div>
           <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
-            선택 파일 기준 답변
+            {badgeLabel}
           </span>
         </div>
 

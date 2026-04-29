@@ -5,6 +5,7 @@ create table if not exists public.orders (
   created_at timestamptz not null default now(),
   pid text,
   process text,
+  product_family text,
   item_code text,
   item_name text not null,
   width numeric,
@@ -80,10 +81,15 @@ create table if not exists public.uploaded_rows (
   created_at timestamptz not null default now(),
   file_id uuid not null references public.uploaded_files(id) on delete cascade,
   row_index integer not null,
+  event_date date,
+  event_month text,
+  event_hour integer,
   pid text,
+  pid_duplicate boolean not null default false,
   customer text,
   site text,
   process text,
+  product_family text,
   item_code text,
   item_name text,
   width numeric,
@@ -97,6 +103,7 @@ create table if not exists public.uploaded_rows (
   area_pyeong numeric,
   is_valid boolean not null default true,
   validation_notes text,
+  anomaly_notes text,
   normalized_text text,
   raw_payload jsonb not null default '{}'::jsonb
 );
@@ -122,6 +129,22 @@ create table if not exists public.ai_conversations (
 
 alter table if exists public.uploaded_files
   add column if not exists analysis_snapshot jsonb not null default '{}'::jsonb;
+
+alter table if exists public.orders
+  add column if not exists product_family text;
+
+alter table if exists public.uploaded_rows
+  add column if not exists event_date date;
+alter table if exists public.uploaded_rows
+  add column if not exists event_month text;
+alter table if exists public.uploaded_rows
+  add column if not exists event_hour integer;
+alter table if exists public.uploaded_rows
+  add column if not exists pid_duplicate boolean not null default false;
+alter table if exists public.uploaded_rows
+  add column if not exists product_family text;
+alter table if exists public.uploaded_rows
+  add column if not exists anomaly_notes text;
 
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_customer_idx on public.orders (customer);
