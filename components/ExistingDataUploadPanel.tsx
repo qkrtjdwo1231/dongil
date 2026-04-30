@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/SectionCard";
+import { supabase } from "@/lib/supabaseClient";
 import type {
   StoredUploadFile,
   UploadAnalysisGroup,
@@ -18,6 +19,11 @@ type ExistingDataUploadPanelProps = {
 type StoredFilesResponse = {
   bucket: string;
   files: StoredUploadFile[];
+};
+
+type StoredSourceInfo = {
+  bucket: string;
+  path: string;
 };
 
 async function postUpload<T>(url: string, file: File) {
@@ -40,6 +46,46 @@ async function postUpload<T>(url: string, file: File) {
   }
 
   return payload as T;
+}
+
+function sanitizeFileName(fileName: string) {
+  const trimmed = fileName.trim();
+  const fallback = "upload-file";
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return (
+    trimmed
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback
+  );
+}
+
+async function uploadFileDirectly(file: File) {
+  if (!supabase) {
+    throw new Error("Supabase 환경변수가 설정되지 않았습니다.");
+  }
+
+  const bucket =
+    process.env.NEXT_PUBLIC_SUPABASE_UPLOAD_BUCKET || "uploads";
+  const today = new Date().toISOString().slice(0, 10);
+  const objectPath = `imports/${today}/${crypto.randomUUID()}-${sanitizeFileName(file.name)}`;
+
+  const response = await supabase.storage.from(bucket).upload(objectPath, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false
+  });
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  return {
+    bucket,
+    path: objectPath
+  } satisfies StoredSourceInfo;
 }
 
 async function requestJson<T>(url: string, options?: RequestInit) {
@@ -117,6 +163,7 @@ function detectColumnGuide(summary: UploadPreviewSummary | null) {
 export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUploadPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [selectedStoredSource, setSelectedStoredSource] = useState<StoredSourceInfo | null>(null);
   const [uploadedFileNames, setUploadedFileNames] = useState<string[]>([]);
   const [summary, setSummary] = useState<UploadPreviewSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -200,6 +247,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
 
     setSelectedFile(file);
     setSelectedFileName(file.name);
+    setSelectedStoredSource(null);
     setSummary(null);
     setLoading(true);
     setSaving(false);
@@ -207,7 +255,8 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
     setMessage(null);
 
     try {
-      const preview = await postUpload<UploadPreviewSummary>("/api/upload/preview", file);
+      const { analyzeWorkbook } = await import("@/lib/upload-processing");
+      const preview = analyzeWorkbook(await file.arrayBuffer(), file.name);
       setSummary(preview);
       setUploadedFileNames((current) => [file.name, ...current.filter((name) => name !== file.name)]);
       setMessage(
@@ -242,10 +291,19 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
 
     setSaving(true);
     setError(null);
-    setMessage("선택한 파일을 분석용 데이터와 원본 행 기준으로 저장하는 중입니다.");
+    setMessage("선택한 파일을 업로드하고 분석용 데이터로 저장하는 중입니다.");
 
     try {
-      const result = await postUpload<UploadImportResult>("/api/upload/import", selectedFile);
+      const storedSource = selectedStoredSource ?? (await uploadFileDirectly(selectedFile));
+      setSelectedStoredSource(storedSource);
+      const result = await requestJson<UploadImportResult>("/api/upload/import", {
+        method: "POST",
+        body: JSON.stringify({
+          storedPath: storedSource.path,
+          storedBucket: storedSource.bucket,
+          originalName: selectedFile.name
+        })
+      });
       await onImportComplete(result);
       const storageNote = result.storedFilePath
         ? ` 저장 위치: ${result.storedFileBucket}/${result.storedFilePath}`

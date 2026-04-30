@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildOrderInsertRows,
@@ -8,6 +8,12 @@ import {
 } from "@/lib/upload-processing";
 
 export const runtime = "nodejs";
+
+type ImportFromStorageBody = {
+  storedPath?: string;
+  storedBucket?: string;
+  originalName?: string;
+};
 
 function createSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,8 +47,8 @@ function buildSummaryText(extraction: ReturnType<typeof extractWorkbookData>) {
     extraction.analysis.periodStart && extraction.analysis.periodEnd
       ? `${extraction.analysis.periodStart} ~ ${extraction.analysis.periodEnd}`
       : null,
-    `수량 ${extraction.analysis.totalQuantity.toLocaleString()}`,
-    `평수 ${extraction.analysis.totalArea.toFixed(1)}`,
+    `총 수량 ${extraction.analysis.totalQuantity.toLocaleString()}`,
+    `총 평수 ${extraction.analysis.totalArea.toFixed(1)}`,
     extraction.analysis.highlights[0] ?? null
   ];
 
@@ -58,7 +64,7 @@ async function saveUploadSourceFile(
     throw new Error("Supabase client is not configured.");
   }
 
-  const bucket = process.env.SUPABASE_UPLOAD_BUCKET || "uploads";
+  const bucket = process.env.SUPABASE_UPLOAD_BUCKET || process.env.NEXT_PUBLIC_SUPABASE_UPLOAD_BUCKET || "uploads";
   const today = new Date().toISOString().slice(0, 10);
   const safeFileName = sanitizeFileName(file.name);
   const objectPath = `imports/${today}/${crypto.randomUUID()}-${safeFileName}`;
@@ -73,19 +79,30 @@ async function saveUploadSourceFile(
 
   return {
     bucket,
-    path: objectPath
+    path: objectPath,
+    fileName: file.name
   };
+}
+
+async function loadStoredSourceFile(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  bucket: string,
+  path: string
+) {
+  if (!supabase) {
+    throw new Error("Supabase client is not configured.");
+  }
+
+  const response = await supabase.storage.from(bucket).download(path);
+  if (response.error || !response.data) {
+    throw new Error(response.error?.message ?? "저장된 원본 파일을 읽지 못했습니다.");
+  }
+
+  return response.data.arrayBuffer();
 }
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file");
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
-    }
-
     const supabase = createSupabaseServerClient();
     if (!supabase) {
       return NextResponse.json(
@@ -94,15 +111,53 @@ export async function POST(request: Request) {
       );
     }
 
-    const buffer = await file.arrayBuffer();
-    const storedFile = await saveUploadSourceFile(supabase, file, buffer);
-    const extraction = extractWorkbookData(buffer, file.name);
+    const contentType = request.headers.get("content-type") ?? "";
+    let buffer: ArrayBuffer;
+    let fileName: string;
+    let storedFile: { bucket: string; path: string };
+
+    if (contentType.includes("application/json")) {
+      const body = (await request.json()) as ImportFromStorageBody;
+      const storedPath = String(body.storedPath ?? "").trim();
+      const storedBucket = String(
+        body.storedBucket ?? process.env.SUPABASE_UPLOAD_BUCKET ?? process.env.NEXT_PUBLIC_SUPABASE_UPLOAD_BUCKET ?? "uploads"
+      ).trim();
+      const originalName = String(body.originalName ?? "").trim();
+
+      if (!storedPath) {
+        return NextResponse.json({ error: "저장된 파일 경로가 없습니다." }, { status: 400 });
+      }
+
+      buffer = await loadStoredSourceFile(supabase, storedBucket, storedPath);
+      fileName = originalName || storedPath.split("/").pop() || "upload-file.xlsx";
+      storedFile = {
+        bucket: storedBucket,
+        path: storedPath
+      };
+    } else {
+      const formData = await request.formData();
+      const file = formData.get("file");
+
+      if (!(file instanceof File)) {
+        return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 });
+      }
+
+      buffer = await file.arrayBuffer();
+      const uploadSource = await saveUploadSourceFile(supabase, file, buffer);
+      storedFile = {
+        bucket: uploadSource.bucket,
+        path: uploadSource.path
+      };
+      fileName = uploadSource.fileName;
+    }
+
+    const extraction = extractWorkbookData(buffer, fileName);
     const summaryText = buildSummaryText(extraction);
 
     const fileInsert = await supabase
       .from("uploaded_files")
       .insert({
-        original_name: file.name,
+        original_name: fileName,
         stored_bucket: storedFile.bucket,
         stored_path: storedFile.path,
         sheet_name: extraction.sheetName,
@@ -170,7 +225,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "파일 저장 중 오류가 발생했습니다."
+        error: error instanceof Error ? error.message : "파일 처리 중 오류가 발생했습니다."
       },
       { status: 500 }
     );
