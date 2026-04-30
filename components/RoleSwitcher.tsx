@@ -32,7 +32,7 @@ export function RoleSwitcher({ value, onChange }: RoleSwitcherProps) {
         className="inline-flex items-center gap-3 rounded-2xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur"
       >
         <span>{value}</span>
-        <span className="text-xs text-[var(--muted)]">{open ? "닫기" : "열기"}</span>
+        <span className="text-xs text-[var(--muted)]">{open ? "▲" : "▼"}</span>
       </button>
 
       {open ? (

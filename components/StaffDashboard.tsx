@@ -7,15 +7,39 @@ import { TeamLeadDashboard } from "@/components/TeamLeadDashboard";
 import { loadDashboardData, updateOrderStatus } from "@/lib/data-access";
 import { supabaseConfig } from "@/lib/supabaseClient";
 import type {
+  ExecutiveMenu,
   OrderRecord,
   OrderStatus,
   Role,
+  TeamLeadMenu,
   UploadedAnalysisFile,
   UploadImportResult
 } from "@/lib/types";
 
+const TEAM_LEAD_NAVIGATION: Array<{ id: TeamLeadMenu; label: string }> = [
+  { id: "dashboard", label: "대시보드" },
+  { id: "projects", label: "프로젝트" },
+  { id: "schedule", label: "일정" },
+  { id: "teams", label: "팀 관리" },
+  { id: "settings", label: "설정" }
+];
+
+const EXECUTIVE_NAVIGATION: Array<{ id: ExecutiveMenu; label: string }> = [
+  { id: "dashboard", label: "대시보드" },
+  { id: "analysis", label: "다차원 분석" },
+  { id: "targets", label: "목표 설정" },
+  { id: "data-grid", label: "데이터 그리드" },
+  { id: "import", label: "데이터 임포트" },
+  { id: "ai-analysis", label: "AI 분석" },
+  { id: "settings", label: "설정" }
+];
+
 export function StaffDashboard() {
-  const [role, setRole] = useState<Role>("팀장");
+  const [role, setRole] = useState<Role>("대표");
+  const [teamLeadMenu, setTeamLeadMenu] = useState<TeamLeadMenu>("teams");
+  const [executiveMenu, setExecutiveMenu] = useState<ExecutiveMenu>("dashboard");
+  const [teamLeadSearch, setTeamLeadSearch] = useState("");
+  const [executiveSearch, setExecutiveSearch] = useState("");
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedAnalysisFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,9 +80,70 @@ export function StaffDashboard() {
     }
   };
 
+  const navigationItems = role === "팀장" ? TEAM_LEAD_NAVIGATION : EXECUTIVE_NAVIGATION;
+  const activeMenu = role === "팀장" ? teamLeadMenu : executiveMenu;
+  const activeSearch = role === "팀장" ? teamLeadSearch : executiveSearch;
+  const activeSearchPlaceholder =
+    role === "팀장"
+      ? "거래처·현장·품명 검색"
+      : "거래처·현장·품명 검색";
+
   return (
     <div className="min-h-screen">
-      <Header role={role} onRoleChange={setRole} />
+      <Header
+        role={role}
+        onRoleChange={setRole}
+        navigation={
+          <nav className="flex items-center gap-0.5">
+            {navigationItems.map((item) => {
+              const active = item.id === activeMenu;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    role === "팀장"
+                      ? setTeamLeadMenu(item.id as TeamLeadMenu)
+                      : setExecutiveMenu(item.id as ExecutiveMenu)
+                  }
+                  className={[
+                    "rounded-2xl px-3 py-2 text-sm font-semibold whitespace-nowrap transition",
+                    active
+                      ? "bg-[var(--foreground)] text-white"
+                      : "text-[var(--foreground)] hover:bg-black/5"
+                  ].join(" ")}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        }
+        searchSlot={
+          <label className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white/80 px-3 py-2 shadow-sm backdrop-blur">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              className="h-4 w-4 shrink-0 text-[var(--muted)]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="M12.5 12.5L17 17" strokeLinecap="round" />
+            </svg>
+            <input
+              value={activeSearch}
+              onChange={(event) =>
+                role === "팀장" ? setTeamLeadSearch(event.target.value) : setExecutiveSearch(event.target.value)
+              }
+              placeholder={activeSearchPlaceholder}
+              className="w-44 bg-transparent text-sm outline-none placeholder:text-[var(--muted)] xl:w-48"
+            />
+          </label>
+        }
+      />
 
       <main className="mx-auto max-w-7xl px-6 py-6">
         {!supabaseConfig.isConfigured ? (
@@ -78,12 +163,24 @@ export function StaffDashboard() {
             생산실적과 업로드 데이터를 불러오는 중입니다.
           </div>
         ) : role === "팀장" ? (
-          <TeamLeadDashboard orders={orders} onImportComplete={handleImportComplete} onStatusChange={handleOrderStatusChange} />
+          <TeamLeadDashboard
+            orders={orders}
+            onImportComplete={handleImportComplete}
+            onStatusChange={handleOrderStatusChange}
+            menu={teamLeadMenu}
+            onMenuChange={setTeamLeadMenu}
+            search={teamLeadSearch}
+            onSearchChange={setTeamLeadSearch}
+          />
         ) : (
           <ExecutiveDashboard
             orders={orders}
             uploadedFiles={uploadedFiles}
             onImportComplete={handleImportComplete}
+            menu={executiveMenu}
+            onMenuChange={setExecutiveMenu}
+            search={executiveSearch}
+            onSearchChange={setExecutiveSearch}
           />
         )}
       </main>

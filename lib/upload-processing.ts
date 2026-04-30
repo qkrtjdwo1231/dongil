@@ -394,14 +394,6 @@ function detectPeakLabel(counter: Map<string, number>) {
 function buildHighlights(summary: Omit<UploadAnalysisSnapshot, "highlights">) {
   const highlights: string[] = [];
 
-  if (summary.rowsDuplicatePid > 0) {
-    highlights.push(`PID 중복 ${summary.rowsDuplicatePid.toLocaleString()}건`);
-  }
-
-  if (summary.rowsMissingPid > 0) {
-    highlights.push(`PID 누락 ${summary.rowsMissingPid.toLocaleString()}건`);
-  }
-
   if (summary.rowsMissingDimensions > 0) {
     highlights.push(`규격 누락 ${summary.rowsMissingDimensions.toLocaleString()}건`);
   }
@@ -431,14 +423,6 @@ function buildHighlights(summary: Omit<UploadAnalysisSnapshot, "highlights">) {
     const familyShare = (topFamily.quantity / summary.totalQuantity) * 100;
     if (familyShare >= 60) {
       highlights.push(`${topFamily.label} 비중 ${familyShare.toFixed(1)}%`);
-    }
-  }
-
-  if (summary.topLines.length && summary.totalQuantity > 0) {
-    const topLine = summary.topLines[0];
-    const lineShare = (topLine.quantity / summary.totalQuantity) * 100;
-    if (lineShare >= 55) {
-      highlights.push(`${topLine.label} 라인 집중 ${lineShare.toFixed(1)}%`);
     }
   }
 

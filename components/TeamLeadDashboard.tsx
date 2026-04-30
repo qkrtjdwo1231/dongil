@@ -37,11 +37,27 @@ type TeamLeadDashboardProps = {
   orders: OrderRecord[];
   onImportComplete: (result: UploadImportResult) => Promise<void> | void;
   onStatusChange: (id: string, status: OrderStatus) => void;
+  menu?: TeamLeadMenu;
+  onMenuChange?: (menu: TeamLeadMenu) => void;
+  search?: string;
+  onSearchChange?: (value: string) => void;
 };
 
-export function TeamLeadDashboard({ orders, onImportComplete, onStatusChange }: TeamLeadDashboardProps) {
-  const [menu, setMenu] = useState<TeamLeadMenu>("teams");
-  const [search, setSearch] = useState("");
+export function TeamLeadDashboard({
+  orders,
+  onImportComplete,
+  onStatusChange,
+  menu: controlledMenu,
+  onMenuChange: controlledOnMenuChange,
+  search: controlledSearch,
+  onSearchChange: controlledOnSearchChange
+}: TeamLeadDashboardProps) {
+  const [localMenu, setLocalMenu] = useState<TeamLeadMenu>("teams");
+  const menu = controlledMenu ?? localMenu;
+  const setMenu = controlledOnMenuChange ?? setLocalMenu;
+  const [localSearch, setLocalSearch] = useState("");
+  const search = controlledSearch ?? localSearch;
+  const setSearch = controlledOnSearchChange ?? setLocalSearch;
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -275,12 +291,10 @@ export function TeamLeadDashboard({ orders, onImportComplete, onStatusChange }: 
       role="팀장"
       title="팀 관리"
       description="시공팀, 라인, 프로젝트 흐름을 한 화면 구조 안에서 관리합니다."
-      searchPlaceholder="PID, 거래처, 현장, 품명, 등록자를 검색하세요"
       menu={teamLeadMenus}
       activeMenu={menu}
       onMenuChange={setMenu}
-      search={search}
-      onSearchChange={setSearch}
+      hideNavigation
     >
       {content}
     </ConsoleShell>

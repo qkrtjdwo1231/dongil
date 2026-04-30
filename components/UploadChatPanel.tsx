@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { StoredUploadFile } from "@/lib/types";
 
 type UploadChatPanelProps = {
@@ -32,15 +32,15 @@ const defaultStarterPrompts = [
   "최근 업로드 파일에서 거래처별 주문 흐름을 요약해줘.",
   "규격이나 수량이 비어 있는 행이 있는지 찾아줘.",
   "자주 나온 품명과 라인을 정리해줘.",
-  "PID가 있는 행 기준으로 핵심 값만 정리해줘."
+  "상위 품목과 제품군 특징을 정리해줘."
 ];
 
 export function UploadChatPanel({
   storedFiles,
   starterPrompts = defaultStarterPrompts,
   title = "AI 업로드 도우미",
-  description = "업로드한 파일과 저장된 업로드 데이터만 기준으로 답변합니다. 추측하지 않고, 필요한 경우 PID·거래처·품명·규격 기준으로 정리해드립니다.",
-  badgeLabel = "선택 파일 기준 답변"
+  description = "업로드한 파일과 저장된 데이터만 기준으로 답변합니다.",
+  badgeLabel = ""
 }: UploadChatPanelProps) {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [question, setQuestion] = useState("");
@@ -48,8 +48,7 @@ export function UploadChatPanel({
     {
       id: crypto.randomUUID(),
       role: "assistant",
-      content:
-        "선택한 업로드 파일만 기준으로 답변합니다. 파일에 없는 내용은 추측하지 않고, 확인되지 않으면 그대로 알려드리겠습니다."
+      content: "궁금한 분석 내용을 입력해 주세요."
     }
   ]);
   const [loading, setLoading] = useState(false);
@@ -71,17 +70,6 @@ export function UploadChatPanel({
       return storedFiles.slice(0, 3).map((file) => file.path);
     });
   }, [storedFiles]);
-
-  const selectedNames = useMemo(
-    () => storedFiles.filter((file) => selectedPaths.includes(file.path)).map((file) => file.name),
-    [selectedPaths, storedFiles]
-  );
-
-  const toggleFile = (path: string) => {
-    setSelectedPaths((current) =>
-      current.includes(path) ? current.filter((item) => item !== path) : [...current, path]
-    );
-  };
 
   const sendQuestion = async (nextQuestion: string) => {
     const trimmed = nextQuestion.trim();
@@ -160,33 +148,16 @@ export function UploadChatPanel({
             <p className="text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">
               {title}
             </p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-              {description}
-            </p>
-          </div>
-          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
-            {badgeLabel}
-          </span>
-        </div>
-
-        <div className="rounded-2xl border border-black/5 bg-[var(--secondary)]/70 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">업로드 데이터 자동 참고</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                최신 업로드 파일 {selectedPaths.length}개를 자동으로 참고합니다.
-                {selectedNames.length ? ` (${selectedNames.join(", ")})` : ""}
+            {description ? (
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+                {description}
               </p>
-            </div>
-            <div className="rounded-2xl bg-white px-3 py-2 text-xs leading-5 text-[var(--muted)] ring-1 ring-black/5">
-              파일이 많아도 전체를 한 번에 읽지 않고, 필요한 행만 골라서 답변합니다.
-            </div>
+            ) : null}
           </div>
-
-          {!storedFiles.length ? (
-            <p className="mt-4 text-sm text-[var(--muted)]">
-              저장된 업로드 파일이 아직 없습니다. 먼저 파일 업로드를 완료해 주세요.
-            </p>
+          {badgeLabel ? (
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">
+              {badgeLabel}
+            </span>
           ) : null}
         </div>
 
@@ -249,7 +220,7 @@ export function UploadChatPanel({
                 <textarea
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="예: PID가 있는 행 기준으로 규격 누락과 수량 누락을 같이 정리해줘."
+                  placeholder="예: 상위 거래처 의존도와 품목 집중도를 같이 정리해줘."
                   rows={3}
                   className="min-h-[88px] flex-1 resize-none rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--primary)]"
                 />

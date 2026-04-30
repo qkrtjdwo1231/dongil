@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/SectionCard";
-import { AiMemoryRulesPanel } from "@/components/AiMemoryRulesPanel";
-import { UploadChatPanel } from "@/components/UploadChatPanel";
 import type {
   StoredUploadFile,
   UploadAnalysisGroup,
@@ -109,10 +107,10 @@ function hasPidRows(summary: UploadPreviewSummary | null) {
 
 function detectColumnGuide(summary: UploadPreviewSummary | null) {
   return [
-    { label: "PID", active: Boolean(summary?.previewRows.some((row) => row.pid)) },
     { label: "거래처", active: Boolean(summary?.previewRows.some((row) => row.draft.customer)) },
     { label: "품명", active: Boolean(summary?.previewRows.some((row) => row.draft.item_name)) },
-    { label: "수량", active: Boolean(summary?.previewRows.some((row) => row.draft.quantity)) }
+    { label: "수량", active: Boolean(summary?.previewRows.some((row) => row.draft.quantity)) },
+    { label: "현장", active: Boolean(summary?.previewRows.some((row) => row.draft.site)) }
   ];
 }
 
@@ -320,8 +318,8 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
 
   return (
     <SectionCard
-      title="파일 업로드 / AI 도우미"
-      description="업로드, 검토, 저장, AI 질의를 한 화면에서 이어서 처리할 수 있는 작업공간입니다. AI 답변과 추천은 선택한 업로드 파일과 저장된 업로드 데이터만 기준으로 생성됩니다."
+      title="파일 업로드"
+      description="업로드, 검토, 저장을 한 화면에서 이어서 처리할 수 있는 작업공간입니다."
     >
       <div className="space-y-6">
         <div className="rounded-[2rem] border border-black/5 bg-white px-5 py-5 shadow-[0_18px_60px_rgba(24,39,56,0.08)]">
@@ -351,7 +349,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                   업로드 파일 작업공간
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                  엑셀 파일을 올리면 먼저 구조를 분석하고, 핵심 컬럼과 PID 포함 여부를 확인한 뒤 저장과 AI 질의를 이어서 진행합니다.
+                  엑셀 파일을 올리면 먼저 구조를 분석하고, 핵심 컬럼과 대표 분석에 필요한 요약 정보를 정리한 뒤 저장합니다.
                 </p>
               </div>
             </div>
@@ -378,12 +376,6 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                 <div className="flex items-center justify-between gap-4">
                   <span>저장 파일 연결</span>
                   <strong className="text-[var(--foreground)]">{selectedStoredFile ? "연결됨" : "미연결"}</strong>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span>PID 포함 여부</span>
-                  <strong className={hasPidRows(summary) ? "text-emerald-700" : "text-amber-700"}>
-                    {hasPidRows(summary) ? "확인됨" : "미확인"}
-                  </strong>
                 </div>
               </div>
             </div>
@@ -451,8 +443,7 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)]">
-          <div className="space-y-6">
+        <div className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="rounded-2xl border border-black/5 bg-white p-5">
                 <p className="text-sm font-semibold text-[var(--foreground)]">분석 요약</p>
@@ -498,10 +489,10 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                     </strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>PID 누락 / 규격 누락</span>
-                    <strong className={hasPidRows(summary) ? "text-amber-700" : "text-[var(--foreground)]"}>
+                    <span>현장 미입력 / 규격 누락</span>
+                    <strong className="text-amber-700">
                       {summary
-                        ? `${summary.analysis.rowsMissingPid.toLocaleString()} / ${summary.analysis.rowsMissingDimensions.toLocaleString()}`
+                        ? `${summary.analysis.rowsMissingSite.toLocaleString()} / ${summary.analysis.rowsMissingDimensions.toLocaleString()}`
                         : "0 / 0"}
                     </strong>
                   </div>
@@ -535,8 +526,8 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                       <thead>
                         <tr className="border-b border-black/5 text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
                           <th className="px-3 py-3">행</th>
-                          <th className="px-3 py-3">PID</th>
                           <th className="px-3 py-3">거래처</th>
+                          <th className="px-3 py-3">현장</th>
                           <th className="px-3 py-3">품명</th>
                           <th className="px-3 py-3">수량</th>
                           <th className="px-3 py-3">상태</th>
@@ -546,10 +537,10 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                         {previewRows.map((row) => (
                           <tr key={row.rowIndex} className="border-b border-black/5 last:border-b-0">
                             <td className="px-3 py-3 text-[var(--muted)]">{row.rowIndex}</td>
-                            <td className="px-3 py-3 text-[var(--foreground)]">{row.pid || "-"}</td>
                             <td className="px-3 py-3 font-medium text-[var(--foreground)]">
                               {row.draft.customer || "-"}
                             </td>
+                            <td className="px-3 py-3 text-[var(--foreground)]">{row.draft.site || "-"}</td>
                             <td className="px-3 py-3 text-[var(--foreground)]">{row.draft.item_name || "-"}</td>
                             <td className="px-3 py-3 text-[var(--foreground)]">{row.draft.quantity || "-"}</td>
                             <td className="px-3 py-3">
@@ -606,18 +597,6 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
               <div className="rounded-2xl border border-black/5 bg-white p-5">
                 <p className="text-sm font-semibold text-[var(--foreground)]">데이터 품질</p>
                 <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>PID 보유 행</span>
-                    <strong className="text-[var(--foreground)]">
-                      {summary ? summary.analysis.rowsWithPid.toLocaleString() : 0}
-                    </strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>PID 중복</span>
-                    <strong className="text-amber-700">
-                      {summary ? summary.analysis.rowsDuplicatePid.toLocaleString() : 0}
-                    </strong>
-                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>거래처 누락</span>
                     <strong className="text-amber-700">
@@ -752,12 +731,6 @@ export function ExistingDataUploadPanel({ onImportComplete }: ExistingDataUpload
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="space-y-6">
-            <UploadChatPanel storedFiles={storedFiles} />
-            <AiMemoryRulesPanel compact />
-          </div>
         </div>
       </div>
     </SectionCard>
