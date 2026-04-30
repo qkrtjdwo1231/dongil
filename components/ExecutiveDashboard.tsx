@@ -112,6 +112,53 @@ function getDateRangeLabel(values: string[]) {
   return `${formatDateLabel(start)} - ${formatDateLabel(end)}`;
 }
 
+function filterOrdersByDateRange(orders: OrderRecord[], start: string, end: string) {
+  if (!start && !end) {
+    return orders;
+  }
+
+  const startDate = start ? new Date(`${start}T00:00:00`) : null;
+  const endDate = end ? new Date(`${end}T23:59:59`) : null;
+
+  return orders.filter((order) => {
+    const current = new Date(order.created_at);
+    if (Number.isNaN(current.getTime())) {
+      return false;
+    }
+    if (startDate && current < startDate) {
+      return false;
+    }
+    if (endDate && current > endDate) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function getPreviousOrdersForDateRange(orders: OrderRecord[], start: string, end: string) {
+  if (!start || !end) {
+    return [];
+  }
+
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T23:59:59`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
+    return [];
+  }
+
+  const span = endDate.getTime() - startDate.getTime();
+  const previousEnd = new Date(startDate.getTime() - 1000);
+  const previousStart = new Date(previousEnd.getTime() - span);
+
+  return orders.filter((order) => {
+    const current = new Date(order.created_at);
+    if (Number.isNaN(current.getTime())) {
+      return false;
+    }
+    return current >= previousStart && current <= previousEnd;
+  });
+}
+
 function getGranularityBucket(value: string, granularity: AnalyticsGranularity) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -234,6 +281,9 @@ export function ExecutiveDashboard({
   const [granularity, setGranularity] = useState<AnalyticsGranularity>("month");
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("pivot");
   const [gridSearch, setGridSearch] = useState("");
+  const [useCustomDateRange, setUseCustomDateRange] = useState(false);
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
 
   const keywordFilteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -257,15 +307,21 @@ export function ExecutiveDashboard({
     );
   }, [orders, search]);
 
-  const rangedOrders = useMemo(
-    () => filterOrdersByRange(keywordFilteredOrders, range),
-    [keywordFilteredOrders, range]
-  );
+  const rangedOrders = useMemo(() => {
+    if (useCustomDateRange) {
+      return filterOrdersByDateRange(keywordFilteredOrders, dateStart, dateEnd);
+    }
 
-  const previousOrders = useMemo(
-    () => (range === "all" ? [] : getPreviousPeriodOrders(keywordFilteredOrders, range)),
-    [keywordFilteredOrders, range]
-  );
+    return filterOrdersByRange(keywordFilteredOrders, range);
+  }, [dateEnd, dateStart, keywordFilteredOrders, range, useCustomDateRange]);
+
+  const previousOrders = useMemo(() => {
+    if (useCustomDateRange) {
+      return getPreviousOrdersForDateRange(keywordFilteredOrders, dateStart, dateEnd);
+    }
+
+    return range === "all" ? [] : getPreviousPeriodOrders(keywordFilteredOrders, range);
+  }, [dateEnd, dateStart, keywordFilteredOrders, range, useCustomDateRange]);
 
   const grouped = useMemo(() => groupOrdersByDimension(rangedOrders, dimension), [rangedOrders, dimension]);
   const topGroups = useMemo(
@@ -293,8 +349,8 @@ export function ExecutiveDashboard({
   const previousJobs = previousOrders.length;
 
   const dashboardDateLabel = useMemo(
-    () => getDateRangeLabel((range === "all" ? keywordFilteredOrders : rangedOrders).map((order) => order.created_at)),
-    [keywordFilteredOrders, range, rangedOrders]
+    () => getDateRangeLabel(rangedOrders.map((order) => order.created_at)),
+    [rangedOrders]
   );
 
   const analysisDateLabel = useMemo(
@@ -434,6 +490,23 @@ export function ExecutiveDashboard({
     return items.length ? items : ["최근 업로드와 현재 기간 데이터 기준으로 즉시 확인할 큰 구조 리스크는 아직 두드러지지 않습니다."];
   }, [latestSnapshot, siteMissingRate, topCustomerShare, topItemShare]);
 
+  const handlePresetRangeClick = (nextRange: AnalyticsRangeKey) => {
+    setUseCustomDateRange(false);
+    setDateStart("");
+    setDateEnd("");
+    setRange(nextRange);
+  };
+
+  const handleDateStartChange = (value: string) => {
+    setUseCustomDateRange(true);
+    setDateStart(value);
+  };
+
+  const handleDateEndChange = (value: string) => {
+    setUseCustomDateRange(true);
+    setDateEnd(value);
+  };
+
   const renderDashboard = () => (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -454,10 +527,12 @@ export function ExecutiveDashboard({
           <button
             key={option.key}
             type="button"
-            onClick={() => setRange(option.key)}
+            onClick={() => handlePresetRangeClick(option.key)}
             className={[
               "rounded-2xl px-4 py-3 text-sm font-semibold transition",
-              range === option.key ? "bg-[var(--foreground)] text-white" : "bg-white text-[var(--foreground)] ring-1 ring-black/5"
+              !useCustomDateRange && range === option.key
+                ? "bg-[var(--foreground)] text-white"
+                : "bg-white text-[var(--foreground)] ring-1 ring-black/5"
             ].join(" ")}
           >
             {option.label}
@@ -545,14 +620,27 @@ export function ExecutiveDashboard({
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)]">
             <div>
               <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">기간 선택</p>
-              <div className="flex items-center gap-3 rounded-2xl border border-black/10 bg-white px-5 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/10 bg-white px-5 py-3 shadow-sm">
                 <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-[var(--foreground)]" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <rect x="3.5" y="4.5" width="13" height="12" rx="2" />
                   <path d="M6.5 2.75V6.25" strokeLinecap="round" />
                   <path d="M13.5 2.75V6.25" strokeLinecap="round" />
                   <path d="M3.5 8.25H16.5" />
                 </svg>
-                <span className="text-sm font-medium text-[var(--foreground)]">{analysisDateLabel}</span>
+                <input
+                  type="date"
+                  value={dateStart}
+                  onChange={(event) => handleDateStartChange(event.target.value)}
+                  className="rounded-xl border border-black/10 px-3 py-2 text-sm text-[var(--foreground)] outline-none"
+                />
+                <span className="text-sm text-[var(--muted)]">-</span>
+                <input
+                  type="date"
+                  value={dateEnd}
+                  onChange={(event) => handleDateEndChange(event.target.value)}
+                  className="rounded-xl border border-black/10 px-3 py-2 text-sm text-[var(--foreground)] outline-none"
+                />
+                <span className="text-sm font-medium text-[var(--muted)]">{analysisDateLabel}</span>
               </div>
             </div>
 
@@ -570,10 +658,12 @@ export function ExecutiveDashboard({
                   <button
                     key={option.key}
                     type="button"
-                    onClick={() => setRange(option.key)}
+                    onClick={() => handlePresetRangeClick(option.key)}
                     className={[
                       "rounded-2xl px-4 py-2.5 text-sm font-semibold transition",
-                      range === option.key ? "bg-[var(--foreground)] text-white" : "bg-white text-[var(--foreground)] ring-1 ring-black/5"
+                      !useCustomDateRange && range === option.key
+                        ? "bg-[var(--foreground)] text-white"
+                        : "bg-white text-[var(--foreground)] ring-1 ring-black/5"
                     ].join(" ")}
                   >
                     {option.label}
