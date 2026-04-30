@@ -23,6 +23,7 @@ import {
   groupOrdersByDimension,
   sumMetric
 } from "@/lib/analytics";
+import { buildCustomerSegments, buildExecutiveInsightReport } from "@/lib/executive-insights";
 import { formatNumber } from "@/lib/utils";
 import type { ExecutiveMenu, OrderRecord, UploadedAnalysisFile, UploadImportResult } from "@/lib/types";
 
@@ -489,6 +490,16 @@ export function ExecutiveDashboard({
     }
     return items.length ? items : ["최근 업로드와 현재 기간 데이터 기준으로 즉시 확인할 큰 구조 리스크는 아직 두드러지지 않습니다."];
   }, [latestSnapshot, siteMissingRate, topCustomerShare, topItemShare]);
+  const customerSegments = useMemo(() => buildCustomerSegments(rangedOrders), [rangedOrders]);
+  const executiveReport = useMemo(
+    () =>
+      buildExecutiveInsightReport({
+        orders: rangedOrders,
+        previousOrders,
+        snapshot: latestSnapshot
+      }),
+    [latestSnapshot, previousOrders, rangedOrders]
+  );
 
   const handlePresetRangeClick = (nextRange: AnalyticsRangeKey) => {
     setUseCustomDateRange(false);
@@ -595,6 +606,48 @@ export function ExecutiveDashboard({
         </SectionCard>
       </div>
 
+      <SectionCard title="대표 리포트" description="현재 구간을 경영 판단용 문장으로 정리한 자동 리포트입니다.">
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-black/5 bg-white p-4">
+              <p className="text-sm font-semibold text-[var(--foreground)]">전체 요약</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--foreground)]">
+                {executiveReport.summary.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-black/5 bg-white p-4">
+              <p className="text-sm font-semibold text-[var(--foreground)]">핵심 변화</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--foreground)]">
+                {executiveReport.changes.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">데이터 품질 이슈</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-amber-900">
+                {executiveReport.quality.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-semibold text-sky-900">액션 아이템</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-sky-900">
+                {executiveReport.actions.map((item) => (
+                  <li key={item}>- {item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard title="거래처 TOP 10" description="평수 기준으로 포장 부담이 큰 거래처를 보여줍니다.">
           <BarList rows={topCustomers} metric="area" emptyMessage="거래처 데이터가 없습니다." />
@@ -603,6 +656,62 @@ export function ExecutiveDashboard({
           <BarList rows={topItems} metric="area" emptyMessage="품목 데이터가 없습니다." />
         </SectionCard>
       </div>
+
+      <SectionCard title="작업 부하 패턴" description="대표가 시간대 집중과 운영 리듬을 빠르게 읽을 수 있도록 정리한 카드입니다.">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: "피크 월",
+              value: latestSnapshot?.peakMonthLabel ?? "-",
+              description: "최근 업로드 기준 가장 물량이 컸던 월"
+            },
+            {
+              label: "피크 시간대",
+              value: latestSnapshot?.peakHourLabel ?? "-",
+              description: "최근 업로드 기준 등록이 가장 몰린 시간대"
+            },
+            {
+              label: "18시 이후 등록",
+              value: latestSnapshot ? formatNumber(latestSnapshot.rowsAfterHours) : "-",
+              description: "마감 시간대 이후 작업 추정 건수"
+            },
+            {
+              label: "주요 등록자 수",
+              value: latestSnapshot ? formatNumber(latestSnapshot.uniqueRegistrants) : "-",
+              description: "최근 업로드 기준 활동 등록자 수"
+            }
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-black/5 bg-white p-4">
+              <p className="text-sm font-medium text-[var(--muted)]">{item.label}</p>
+              <p className="mt-3 text-2xl font-bold tracking-[-0.03em] text-[var(--foreground)]">{item.value}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="거래처 유형 분류" description="대표 관점에서 거래처를 물량 성격과 관리 포인트 기준으로 나눕니다.">
+        <div className="grid gap-4 xl:grid-cols-2">
+          {customerSegments.length ? (
+            customerSegments.slice(0, 8).map((segment) => (
+              <div key={segment.customer} className="rounded-2xl border border-black/5 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{segment.customer}</p>
+                  <span className="rounded-full bg-[var(--secondary)] px-3 py-1 text-xs font-semibold text-[var(--foreground)]">
+                    {segment.label}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-[var(--muted)]">{segment.reason}</p>
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  총 평수 {segment.area.toFixed(1)} / 총 수량 {formatNumber(segment.quantity)}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-[var(--muted)]">거래처 유형 분류를 만들 수 있는 데이터가 아직 없습니다.</p>
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 
