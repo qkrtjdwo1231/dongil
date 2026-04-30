@@ -6,9 +6,10 @@ type HeaderProps = {
   onRoleChange: (role: Role) => void;
   navigation?: React.ReactNode;
   searchSlot?: React.ReactNode;
+  actionSlot?: React.ReactNode;
 };
 
-export function Header({ role, onRoleChange, navigation, searchSlot }: HeaderProps) {
+export function Header({ role, onRoleChange, navigation, searchSlot, actionSlot }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 border-b border-black/5 bg-white/70 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6 py-5">
@@ -25,6 +26,8 @@ export function Header({ role, onRoleChange, navigation, searchSlot }: HeaderPro
           <div className="min-w-0 flex-1">{navigation}</div>
 
           {searchSlot ? <div className="hidden shrink-0 lg:block">{searchSlot}</div> : null}
+
+          {actionSlot ? <div className="shrink-0">{actionSlot}</div> : null}
 
           <div className="shrink-0">
             <RoleSwitcher value={role} onChange={onRoleChange} />

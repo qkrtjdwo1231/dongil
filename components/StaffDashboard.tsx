@@ -80,6 +80,16 @@ export function StaffDashboard() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST"
+      });
+    } finally {
+      window.location.reload();
+    }
+  };
+
   const navigationItems = role === "팀장" ? TEAM_LEAD_NAVIGATION : EXECUTIVE_NAVIGATION;
   const activeMenu = role === "팀장" ? teamLeadMenu : executiveMenu;
   const activeSearch = role === "팀장" ? teamLeadSearch : executiveSearch;
@@ -142,6 +152,15 @@ export function StaffDashboard() {
               className="w-44 bg-transparent text-sm outline-none placeholder:text-[var(--muted)] xl:w-48"
             />
           </label>
+        }
+        actionSlot={
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-2xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur"
+          >
+            로그아웃
+          </button>
         }
       />
 
