@@ -76,6 +76,12 @@ export function LoginScreen() {
             />
           </label>
 
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">테스트 계정</p>
+            <p className="mt-1">아이디: admin</p>
+            <p>비밀번호: admin1234</p>
+          </div>
+
           {error ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
               {error}
